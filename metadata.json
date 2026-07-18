@@ -1,0 +1,6 @@
+{
+  "name": "College Attendance Tracker",
+  "description": "A web app to track subject-wise attendance using OCR timetable extraction.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
