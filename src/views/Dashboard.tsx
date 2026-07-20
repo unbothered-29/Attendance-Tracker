@@ -447,15 +447,15 @@ export function Dashboard() {
 
       {/* Profile Modal */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-md shadow-2xl border-purple-500/30 animate-in fade-in zoom-in duration-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md shadow-2xl border-purple-500/30 animate-in fade-in zoom-in duration-200 max-h-[95vh] flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 shrink-0">
               <CardTitle>Edit Profile</CardTitle>
               <Button variant="ghost" size="icon" onClick={() => setShowProfileModal(false)}>
                 <XCircle className="w-5 h-5 text-gray-400" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <CardContent className="space-y-4 overflow-y-auto flex-1">
               {/* Not fully implemented yet - just basic user info rendering for now */}
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -535,14 +535,14 @@ export function Dashboard() {
 
       {/* Calendar Modal */}
       {showCalendarModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-lg shadow-2xl border-purple-500/30 animate-in fade-in zoom-in duration-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-lg shadow-2xl border-purple-500/30 animate-in fade-in zoom-in duration-200 max-h-[95vh] flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 sm:pb-4 shrink-0">
               <Button variant="ghost" size="icon" onClick={() => setCalendarViewDate(subMonths(calendarViewDate, 1))}>
                 &larr;
               </Button>
-              <CardTitle className="text-xl font-bold">{format(calendarViewDate, 'MMMM yyyy')}</CardTitle>
-              <div className="flex items-center gap-2">
+              <CardTitle className="text-lg sm:text-xl font-bold">{format(calendarViewDate, 'MMMM yyyy')}</CardTitle>
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button variant="ghost" size="icon" onClick={() => setCalendarViewDate(addMonths(calendarViewDate, 1))}>
                   &rarr;
                 </Button>
@@ -554,10 +554,13 @@ export function Dashboard() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-7 gap-1 mb-2">
+            <CardContent className="space-y-2 sm:space-y-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-7 gap-1 mb-1 sm:mb-2">
                 {DAYS.map(day => (
-                  <div key={day} className="text-center text-xs text-gray-500 font-semibold">{day}</div>
+                  <div key={day} className="text-center text-[10px] sm:text-xs text-gray-500 font-semibold truncate" title={day}>
+                    <span className="sm:hidden">{day.charAt(0)}</span>
+                    <span className="hidden sm:inline">{day}</span>
+                  </div>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -572,7 +575,7 @@ export function Dashboard() {
                     <div 
                       key={i} 
                       className={cn(
-                        "p-2 min-h-[60px] rounded-lg border cursor-pointer select-none transition-colors relative flex flex-col",
+                        "p-1 sm:p-2 min-h-[40px] sm:min-h-[60px] rounded-lg border cursor-pointer select-none transition-colors relative flex flex-col",
                         !isCurrentMonth && "opacity-40",
                         isSelected ? "bg-purple-600/30 border-purple-400" :
                         isToday ? "bg-purple-600/20 border-purple-500" : "bg-[#120919] border-purple-900/40 hover:bg-purple-900/20"
@@ -582,11 +585,11 @@ export function Dashboard() {
                         setEditingNote(state.notes?.[dateStr] || '');
                       }}
                     >
-                      <div className={cn("text-sm font-medium", isToday ? "text-purple-300" : "text-gray-200")}>
+                      <div className={cn("text-xs sm:text-sm font-medium", isToday ? "text-purple-300" : "text-gray-200")}>
                         {format(date, 'd')}
                       </div>
                       {hasNote && (
-                        <div className="mt-auto self-start bg-purple-500 w-2 h-2 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]"></div>
+                        <div className="mt-auto self-start bg-purple-500 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]"></div>
                       )}
                     </div>
                   );
@@ -594,19 +597,19 @@ export function Dashboard() {
               </div>
 
               {selectedCalendarDate && (
-                <div className="pt-4 border-t border-purple-900/30 mt-4 animate-in slide-in-from-bottom-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-sm font-medium text-purple-300">
+                <div className="pt-2 sm:pt-4 border-t border-purple-900/30 mt-2 sm:mt-4 animate-in slide-in-from-bottom-2 shrink-0">
+                  <div className="flex justify-between items-center mb-1 sm:mb-2">
+                    <label className="text-xs sm:text-sm font-medium text-purple-300">
                       Note for {format(selectedCalendarDate, 'MMMM d, yyyy')}
                     </label>
                   </div>
                   <textarea
-                    className="w-full bg-[#120919] border border-purple-500/30 rounded-lg p-3 text-sm text-gray-200 focus:outline-none focus:border-purple-500 resize-none min-h-[80px]"
+                    className="w-full bg-[#120919] border border-purple-500/30 rounded-lg p-2 sm:p-3 text-xs sm:text-sm text-gray-200 focus:outline-none focus:border-purple-500 resize-none min-h-[60px] sm:min-h-[80px]"
                     placeholder="Add a note..."
                     value={editingNote}
                     onChange={(e) => setEditingNote(e.target.value)}
                   />
-                  <div className="flex justify-end gap-2 mt-2">
+                  <div className="flex justify-end gap-2 mt-2 pb-2">
                     <Button variant="ghost" size="sm" onClick={() => setSelectedCalendarDate(null)}>
                       Cancel
                     </Button>
