@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
-import { BookOpen } from 'lucide-react';
+import { GraduationCap } from 'lucide-react';
 
 export function Login() {
   const { login } = useAppContext();
@@ -27,15 +27,16 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto bg-purple-600/20 w-16 h-16 rounded-2xl flex items-center justify-center">
-            <BookOpen className="w-8 h-8 text-purple-500" />
+    <div className="min-h-screen flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent blur-3xl -z-10" />
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="text-center space-y-4 pb-8">
+          <div className="mx-auto w-20 h-20 bg-purple-500/10 rounded-3xl flex items-center justify-center mb-2 ring-1 ring-purple-500/20 shadow-inner">
+            <GraduationCap className="w-10 h-10 text-purple-400" />
           </div>
           <div>
-            <CardTitle className="text-2xl">Welcome to Tracker</CardTitle>
-            <p className="text-sm text-gray-400 mt-2">Log in to track your college attendance</p>
+            <CardTitle className="text-4xl font-display font-bold tracking-tight bg-gradient-to-br from-white to-purple-300 bg-clip-text text-transparent">Welcome to Tracker</CardTitle>
+            <p className="text-base text-gray-400 mt-3">Log in to track your college attendance</p>
           </div>
         </CardHeader>
         <CardContent>
@@ -66,7 +67,7 @@ export function Login() {
               <Label htmlFor="college">College</Label>
               <select
                 id="college"
-                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-[#120919] px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
                 value={college}
                 onChange={(e) => setCollege(e.target.value)}
               >

@@ -16,6 +16,8 @@ export interface TimeSlot {
   start: string; // HH:mm
   end: string; // HH:mm
   dayOfWeek: number; // 0 (Sun) to 6 (Sat)
+  year?: string; // Optional year identifier
+  division?: string; // Optional division identifier
   batch?: string; // Optional batch identifier
 }
 
@@ -37,6 +39,7 @@ export interface AppState {
   isSetupComplete: boolean;
   userBatch?: string;
   userYear?: string;
+  userDivision?: string;
   userField?: string;
   userSemester?: string;
   notes?: Record<string, string>;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { NATIONAL_HOLIDAYS, cn, formatTime12 } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -15,7 +15,7 @@ export function Dashboard() {
     state, markAttendance, removeAttendance, toggleOffDay, 
     updateDailySlotOverride, updateTimetableSlot, startNewSemester, 
     resetData, setNote, setSubjects, setTimetable,
-    login, setUserField, setUserYear, setUserSemester, setAttendanceGoal
+    login, setUserField, setUserYear, setUserDivision, setUserBatch, setUserSemester, setAttendanceGoal
   } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -60,7 +60,10 @@ export function Dashboard() {
             return {
               ...s,
               id: generateId(),
-              subjectId: matchingNewSubject ? matchingNewSubject.id : s.subjectId
+              subjectId: matchingNewSubject ? matchingNewSubject.id : s.subjectId,
+              year: s.year || undefined,
+              division: s.division || undefined,
+              batch: s.batch || undefined
             };
           });
 
@@ -98,6 +101,15 @@ export function Dashboard() {
     return eachDayOfInterval({ start, end });
   }, [calendarViewDate, showCalendarModal]);
 
+  const filteredTimetable = useMemo(() => {
+    return state.timetable.filter(t => {
+      if (t.year && state.userYear && t.year !== state.userYear) return false;
+      if (t.division && state.userDivision && t.division !== state.userDivision) return false;
+      if (t.batch && state.userBatch && t.batch !== state.userBatch) return false;
+      return true;
+    });
+  }, [state.timetable, state.userYear, state.userDivision, state.userBatch]);
+
   // Compute Stats
   const stats = useMemo(() => {
     const res: Record<string, { 
@@ -113,7 +125,7 @@ export function Dashboard() {
       // Check if date is a holiday or marked off
       if (NATIONAL_HOLIDAYS.includes(log.date) || state.markedOffDays.includes(log.date)) return;
       
-      const slot = state.timetable.find(s => s.id === log.slotId);
+      const slot = filteredTimetable.find(s => s.id === log.slotId);
       if (slot && res[slot.subjectId]) {
         const type = slot.batch ? 'practical' : 'lecture';
         res[slot.subjectId][type].total += 1;
@@ -124,7 +136,7 @@ export function Dashboard() {
     });
 
     return res;
-  }, [state.attendanceLog, state.subjects, state.timetable, state.markedOffDays]);
+  }, [state.attendanceLog, state.subjects, filteredTimetable, state.markedOffDays]);
 
   const [selectedSlotInfo, setSelectedSlotInfo] = useState<{ slot: TimeSlot, dateStr: string } | null>(null);
   const [isEditingSlot, setIsEditingSlot] = useState(false);
@@ -173,15 +185,36 @@ export function Dashboard() {
     return state.attendanceLog[`${dateStr}_${slotId}`]?.status;
   };
 
+  useEffect(() => {
+    // Scroll to the current date on mobile devices
+    if (window.innerWidth < 768) {
+      const dateStr = format(currentDate, 'yyyy-MM-dd');
+      const el = document.getElementById(`day-${dateStr}`);
+      if (el) {
+        // Use a small timeout to ensure rendering is complete
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }, 100);
+      }
+    }
+  }, [currentDate]);
+
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-purple-900/30 pb-6">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/5 pb-8 relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent blur-3xl -z-10 rounded-full" />
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">{state.user?.name}'s Dashboard</h1>
-          <p className="text-gray-400 mt-1">
-            {state.userField && state.userYear ? `${state.userField} - ${state.userYear}` : ''}{state.userSemester ? ` (Semester ${state.userSemester})` : ''} • Goal: {state.attendanceGoal}%
+          <h1 className="text-4xl sm:text-5xl font-display font-bold tracking-tight bg-gradient-to-br from-white via-white to-purple-400 bg-clip-text text-transparent">
+            {state.user?.name}'s Dashboard
+          </h1>
+          <p className="text-gray-400 mt-2 flex flex-wrap items-center gap-2 text-sm sm:text-base">
+            <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/10">{state.userField && state.userYear ? `${state.userField} - ${state.userYear}` : 'No Field'}</span>
+            {state.userDivision && <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/10">Div {state.userDivision}</span>}
+            {state.userSemester && <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/10">Sem {state.userSemester}</span>}
+            {state.userBatch && <span className="px-2.5 py-1 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-200">Batch {state.userBatch}</span>}
+            <span className="px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/20 text-green-300">Goal: {state.attendanceGoal}%</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -223,8 +256,8 @@ export function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto pb-4">
-                <div className="min-w-[700px] grid grid-cols-7 gap-2">
+              <div className="overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar" id="timetable-scroll-container">
+                <div className="flex md:grid md:grid-cols-7 gap-4 md:gap-2 min-w-full md:min-w-[700px]">
                   {/* Days Header */}
                   {weekDays.map((date, i) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
@@ -232,26 +265,26 @@ export function Dashboard() {
                     const isHoliday = NATIONAL_HOLIDAYS.includes(dateStr) || state.markedOffDays.includes(dateStr);
                     
                     return (
-                      <div key={i} className="text-center space-y-2">
+                      <div key={i} id={`day-${dateStr}`} className="w-full shrink-0 md:w-auto md:shrink snap-center text-center space-y-3">
                         <div className={cn(
-                          "py-2 rounded-lg border cursor-pointer select-none transition-colors",
-                          isToday ? "bg-purple-600/20 border-purple-500" : "bg-[#120919] border-purple-900/40 hover:bg-purple-900/20",
-                          isHoliday && "opacity-60 border-dashed"
+                          "py-3 rounded-xl border cursor-pointer select-none transition-all shadow-sm",
+                          isToday ? "bg-purple-500/20 border-purple-500/50 shadow-purple-500/10" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04]",
+                          isHoliday && "opacity-50 border-dashed hover:opacity-80"
                         )}
                         onClick={() => toggleOffDay(dateStr)}
                         title={isHoliday ? "Marked as Holiday (Click to unmark)" : "Click to mark as Holiday/Off"}
                         >
-                          <div className="text-xs text-gray-500 uppercase font-semibold">{DAYS[date.getDay()]}</div>
-                          <div className={cn("text-lg font-bold", isToday ? "text-purple-300" : "text-gray-200")}>
+                          <div className={cn("text-xs uppercase font-bold tracking-wider", isToday ? "text-purple-300" : "text-gray-500")}>{DAYS[date.getDay()]}</div>
+                          <div className={cn("text-2xl font-display font-bold mt-1", isToday ? "text-white" : "text-gray-200")}>
                             {format(date, 'd')}
                           </div>
-                          <div className="text-[10px] text-gray-500">{format(date, 'MMM yyyy')}</div>
-                          {isHoliday && <div className="text-[10px] text-purple-400 mt-1 flex items-center justify-center"><CalendarOff className="w-3 h-3 mr-1"/> Off</div>}
+                          <div className="text-[10px] text-gray-400 mt-0.5">{format(date, 'MMM yyyy')}</div>
+                          {isHoliday && <div className="text-[10px] text-purple-400 mt-2 flex items-center justify-center font-medium bg-purple-500/10 py-1 mx-2 rounded"><CalendarOff className="w-3 h-3 mr-1"/> Off Day</div>}
                         </div>
                         
                         {/* Slots for this day */}
                         <div className="space-y-2">
-                          {state.timetable
+                          {filteredTimetable
                             .filter(t => t.dayOfWeek === date.getDay())
                             .sort((a, b) => a.start.localeCompare(b.start))
                             .map(baseSlot => {
@@ -281,23 +314,24 @@ export function Dashboard() {
                                   onClick={() => !isHoliday && handleSlotClick(slot, dateStr)}
                                   style={{ height: `${blockHeight}rem` }}
                                   className={cn(
-                                    "p-2.5 rounded-lg text-left text-sm cursor-pointer border transition-all relative overflow-hidden flex flex-col justify-between",
-                                    status === 'holiday' ? "bg-gray-900/50 border-gray-800 text-gray-600 pointer-events-none" :
-                                    status === 'attended' ? "bg-green-500/10 border-green-500/30 hover:border-green-500/50" :
-                                    status === 'skipped' ? "bg-red-500/10 border-red-500/30 hover:border-red-500/50" :
-                                    "bg-[#1a0d24] border-purple-500/20 hover:border-purple-500/50"
+                                    "p-3 rounded-xl text-left text-sm cursor-pointer border transition-all relative overflow-hidden flex flex-col justify-between shadow-sm group",
+                                    status === 'holiday' ? "bg-white/[0.02] border-white/10 border-dashed opacity-50 pointer-events-none" :
+                                    status === 'attended' ? "bg-green-500/10 border-green-500/30 hover:border-green-500/50 hover:bg-green-500/20" :
+                                    status === 'skipped' ? "bg-red-500/10 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/20" :
+                                    "bg-white/[0.03] border-white/10 hover:border-purple-500/40 hover:bg-white/[0.06]"
                                   )}
                                 >
-                                  <div className="space-y-0.5">
+                                  <div className="space-y-1">
                                     <div className="font-semibold text-gray-200 truncate pr-4 leading-tight">{getSubjectName(slot.subjectId)}</div>
                                     {state.subjects.find(s => s.id === slot.subjectId)?.teacher && (
                                       <div className="text-[11px] text-gray-400 truncate pr-4">{state.subjects.find(s => s.id === slot.subjectId)?.teacher}</div>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-gray-500 font-medium">{formatTime12(slot.start)} - {formatTime12(slot.end)}</div>
+                                  <div className="text-[10px] text-gray-400 font-medium tracking-wide">{formatTime12(slot.start)} - {formatTime12(slot.end)}</div>
                                   
-                                  {status === 'attended' && <CheckCircle2 className="w-4 h-4 text-green-500 absolute top-2.5 right-2.5 opacity-50" />}
-                                  {status === 'skipped' && <XCircle className="w-4 h-4 text-red-500 absolute top-2.5 right-2.5 opacity-50" />}
+                                  {status === 'attended' && <CheckCircle2 className="w-4 h-4 text-green-400 absolute top-3 right-3 opacity-80" />}
+                                  {status === 'skipped' && <XCircle className="w-4 h-4 text-red-400 absolute top-3 right-3 opacity-80" />}
+                                  {!status && <div className="absolute top-3 right-3 w-4 h-4 rounded-full border border-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />}
                                 </div>
                               );
                             })}
@@ -318,36 +352,38 @@ export function Dashboard() {
               <CardTitle>Attendance Stats</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {state.subjects.length === 0 && <p className="text-sm text-gray-500">No subjects tracked.</p>}
-              {state.subjects.map(subject => {
+              {state.subjects.filter(subject => filteredTimetable.some(t => t.subjectId === subject.id)).length === 0 && <p className="text-sm text-gray-500">No subjects tracked.</p>}
+              {state.subjects.filter(subject => filteredTimetable.some(t => t.subjectId === subject.id)).map(subject => {
                 const s = stats[subject.id];
-                const totalAttended = s.lecture.attended + s.practical.attended;
-                const totalConducted = s.lecture.total + s.practical.total;
+                const totalAttended = s ? s.lecture.attended + s.practical.attended : 0;
+                const totalConducted = s ? s.lecture.total + s.practical.total : 0;
                 
                 // Calculate projected total over 72 days
-                const weeklyLectures = state.timetable.filter(t => t.subjectId === subject.id && !t.batch).length;
-                const weeklyPracticals = state.timetable.filter(t => t.subjectId === subject.id && t.batch).length;
+                const weeklyLectures = filteredTimetable.filter(t => t.subjectId === subject.id && !t.batch).length;
+                const weeklyPracticals = filteredTimetable.filter(t => t.subjectId === subject.id && t.batch).length;
                 const totalWeekly = weeklyLectures + weeklyPracticals;
                 
                 const semesterLectures = Math.round(weeklyLectures * (72 / 7));
                 const semesterPracticals = Math.round(weeklyPracticals * (72 / 7));
                 const semesterTotal = semesterLectures + semesterPracticals;
                 
-                const currentPerc = totalConducted > 0 ? Math.round((totalAttended / totalConducted) * 100) : 0;
-                const projectedPerc = semesterTotal > 0 ? Math.round((totalAttended / semesterTotal) * 100) : 0;
+                const totalSkipped = totalConducted - totalAttended;
                 
-                const isSafe = projectedPerc >= state.attendanceGoal;
+                const currentPerc = totalConducted > 0 ? Math.round((totalAttended / totalConducted) * 100) : 0;
+                const overallPerc = semesterTotal > 0 ? Math.round((totalAttended / semesterTotal) * 100) : 0;
+                const overallSkippedPerc = semesterTotal > 0 ? Math.round((totalSkipped / semesterTotal) * 100) : 0;
+                
+                const isSafe = currentPerc >= state.attendanceGoal;
                 
                 // Calculate safe skips or needed to attend based on current total
                 let safeSkips = 0;
                 let needed = 0;
-                if (semesterTotal > 0) {
+                if (totalConducted > 0) {
                   const goalFrac = state.attendanceGoal / 100;
-                  const currentSafe = Math.floor((totalAttended - goalFrac * semesterTotal) / goalFrac);
-                  if (currentSafe > 0) safeSkips = currentSafe;
-                  
-                  if (!isSafe && goalFrac < 1) {
-                    needed = Math.ceil((goalFrac * semesterTotal - totalAttended) / (1 - goalFrac));
+                  if (isSafe) {
+                    safeSkips = Math.floor((totalAttended - goalFrac * totalConducted) / goalFrac);
+                  } else if (goalFrac < 1) {
+                    needed = Math.ceil((goalFrac * totalConducted - totalAttended) / (1 - goalFrac));
                   }
                 }
 
@@ -363,32 +399,32 @@ export function Dashboard() {
                 }
 
                 return (
-                  <div key={subject.id} className="p-4 rounded-lg bg-[#120919] border border-purple-900/30">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="font-medium text-gray-200">{subject.name}</div>
-                      <div className={cn("text-lg font-bold", isSafe ? "text-green-400" : semesterTotal > 0 ? "text-red-400" : "text-gray-400")}>
-                        {semesterTotal > 0 ? `${projectedPerc}%` : '-'}
+                  <div key={subject.id} className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors shadow-sm">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="font-semibold text-gray-200">{subject.name}</div>
+                      <div className={cn("text-2xl font-display font-bold", isSafe ? "text-green-400" : "text-red-400")}>
+                        {semesterTotal > 0 ? `${overallPerc}%` : '-'}
                       </div>
                     </div>
                     
-                    <div className="flex flex-col gap-1 text-xs text-gray-500 mt-2">
+                    <div className="flex flex-col gap-1.5 text-xs text-gray-400 mt-2">
                       <div className="flex flex-col sm:flex-row justify-between">
-                        <span>Current: {totalAttended} / {totalConducted} attended</span>
+                        <span>Current: {totalAttended} / {totalConducted} attended ({totalConducted > 0 ? currentPerc : 0}%)</span>
                         {totalConducted > 0 && (
-                          <span className="mt-1 sm:mt-0">
+                          <span className="mt-1 sm:mt-0 font-medium">
                             {isSafe ? (
-                              <span className="text-green-400/80">{safeSkips} safe skips</span>
+                              <span className="text-green-400">Can skip {safeSkips} {safeSkips === 1 ? 'class' : 'classes'}</span>
                             ) : (
-                              <span className="text-red-400/80">Need {needed} classes (now)</span>
+                              <span className="text-red-400">Need {needed} {needed === 1 ? 'class' : 'classes'} (now)</span>
                             )}
                           </span>
                         )}
                       </div>
                       
-                      <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-purple-900/30">
+                      <div className="flex flex-col gap-1 mt-2 pt-3 border-t border-white/5">
                         <div className="flex flex-col sm:flex-row justify-between">
                           <span>Semester (72 Days): {totalAttended} / {semesterTotal}</span>
-                          <span className="text-purple-400/80 mt-1 sm:mt-0">Need {remainingNeededForSemester} more to hit {state.attendanceGoal}%</span>
+                          <span className="text-purple-300 font-medium mt-1 sm:mt-0">Need {remainingNeededForSemester} more to hit {state.attendanceGoal}%</span>
                         </div>
                         {remainingNeededForSemester > 0 && (
                           <div className="flex justify-end text-[10px] text-gray-500">
@@ -398,11 +434,16 @@ export function Dashboard() {
                       </div>
                     </div>
                     
-                    <div className="h-1.5 w-full bg-gray-800 rounded-full mt-3 overflow-hidden flex">
+                    <div className="h-2 w-full bg-white/5 rounded-full mt-4 overflow-hidden flex ring-1 ring-white/10">
                       <div 
-                        className={cn("h-full transition-all", isSafe ? "bg-green-500" : "bg-red-500")} 
-                        style={{ width: `${Math.min(projectedPerc, 100)}%` }}
-                        title={`Projected: ${projectedPerc}%`}
+                        className="bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] h-full transition-all" 
+                        style={{ width: `${Math.min(overallPerc, 100)}%` }}
+                        title={`Attended: ${overallPerc}%`}
+                      />
+                      <div 
+                        className="bg-red-500/80 shadow-[0_0_10px_rgba(239,68,68,0.5)] h-full transition-all" 
+                        style={{ width: `${Math.min(overallSkippedPerc, 100 - Math.min(overallPerc, 100))}%` }}
+                        title={`Skipped: ${overallSkippedPerc}%`}
                       />
                     </div>
                   </div>
@@ -461,7 +502,7 @@ export function Dashboard() {
                 <div className="space-y-2">
                   <label className="text-sm text-purple-300">Name</label>
                   <input 
-                    className="w-full bg-[#120919] border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                     defaultValue={state.user?.name}
                     onChange={(e) => login({ ...state.user!, name: e.target.value })}
                   />
@@ -470,7 +511,7 @@ export function Dashboard() {
                   <div className="space-y-2">
                     <label className="text-sm text-purple-300">Field</label>
                     <input 
-                      className="w-full bg-[#120919] border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userField}
                       onChange={(e) => setUserField(e.target.value)}
                     />
@@ -478,7 +519,7 @@ export function Dashboard() {
                   <div className="space-y-2">
                     <label className="text-sm text-purple-300">Year</label>
                     <input 
-                      className="w-full bg-[#120919] border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userYear}
                       onChange={(e) => setUserYear(e.target.value)}
                     />
@@ -486,9 +527,27 @@ export function Dashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <label className="text-sm text-purple-300">Division</label>
+                    <input 
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                      defaultValue={state.userDivision}
+                      onChange={(e) => setUserDivision(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-purple-300">Batch</label>
+                    <input 
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                      defaultValue={state.userBatch}
+                      onChange={(e) => setUserBatch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <label className="text-sm text-purple-300">Semester</label>
                     <input 
-                      className="w-full bg-[#120919] border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userSemester}
                       onChange={(e) => setUserSemester(e.target.value)}
                     />
@@ -497,13 +556,13 @@ export function Dashboard() {
                     <label className="text-sm text-purple-300">Goal (%)</label>
                     <input 
                       type="number"
-                      className="w-full bg-[#120919] border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.attendanceGoal}
                       onChange={(e) => setAttendanceGoal(Number(e.target.value))}
                     />
                   </div>
                 </div>
-                <div className="pt-4 border-t border-purple-900/30 space-y-3">
+                <div className="pt-4 border-t border-white/5 space-y-3">
                   <input
                     type="file"
                     accept="image/*"
@@ -578,7 +637,7 @@ export function Dashboard() {
                         "p-1 sm:p-2 min-h-[40px] sm:min-h-[60px] rounded-lg border cursor-pointer select-none transition-colors relative flex flex-col",
                         !isCurrentMonth && "opacity-40",
                         isSelected ? "bg-purple-600/30 border-purple-400" :
-                        isToday ? "bg-purple-600/20 border-purple-500" : "bg-[#120919] border-purple-900/40 hover:bg-purple-900/20"
+                        isToday ? "bg-purple-600/20 border-purple-500" : "bg-white/5 border-white/5 hover:bg-white/[0.04]"
                       )}
                       onClick={() => {
                         setSelectedCalendarDate(date);
@@ -597,14 +656,14 @@ export function Dashboard() {
               </div>
 
               {selectedCalendarDate && (
-                <div className="pt-2 sm:pt-4 border-t border-purple-900/30 mt-2 sm:mt-4 animate-in slide-in-from-bottom-2 shrink-0">
+                <div className="pt-2 sm:pt-4 border-t border-white/5 mt-2 sm:mt-4 animate-in slide-in-from-bottom-2 shrink-0">
                   <div className="flex justify-between items-center mb-1 sm:mb-2">
                     <label className="text-xs sm:text-sm font-medium text-purple-300">
                       Note for {format(selectedCalendarDate, 'MMMM d, yyyy')}
                     </label>
                   </div>
                   <textarea
-                    className="w-full bg-[#120919] border border-purple-500/30 rounded-lg p-2 sm:p-3 text-xs sm:text-sm text-gray-200 focus:outline-none focus:border-purple-500 resize-none min-h-[60px] sm:min-h-[80px]"
+                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg p-2 sm:p-3 text-xs sm:text-sm text-gray-200 focus:outline-none focus:border-purple-500 resize-none min-h-[60px] sm:min-h-[80px]"
                     placeholder="Add a note..."
                     value={editingNote}
                     onChange={(e) => setEditingNote(e.target.value)}
@@ -643,11 +702,11 @@ export function Dashboard() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-200">Subject</label>
                     <select 
-                      className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-[#120919] px-3 py-2 text-sm text-gray-200 focus:outline-none"
+                      className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus:outline-none"
                       value={editSlotData.subjectId}
                       onChange={(e) => setEditSlotData({ ...editSlotData, subjectId: e.target.value })}
                     >
-                      {state.subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      {state.subjects.filter(subject => filteredTimetable.some(t => t.subjectId === subject.id)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
                   <div className="flex gap-4">

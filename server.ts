@@ -27,6 +27,8 @@ async function startServer() {
 Extract the timetable schedule from this image.
 Return ONLY valid JSON matching this schema, without any markdown formatting or code blocks:
 {
+  "years": ["FE", "SE", "TE", "BE"], // List of years if the timetable specifies them. Empty array if not applicable.
+  "divisions": ["A", "B", "C"], // List of divisions if the timetable specifies them. Empty array if not applicable.
   "batches": ["B1", "B2"], // List of batch names if the timetable has batch-specific slots (e.g. practicals). Empty array if no batches.
   "subjects": [{"id": "sub_1", "name": "Subject Name", "teacher": "Teacher Name (if available)"}],
   "slots": [
@@ -36,7 +38,9 @@ Return ONLY valid JSON matching this schema, without any markdown formatting or 
       "start": "09:00",
       "end": "10:00",
       "dayOfWeek": 1, // 0=Sun, 1=Mon, 2=Tue, etc.
-      "batch": "B1" // Include this ONLY if the slot is for a specific batch. Omit or set null if for all batches.
+      "year": "FE", // Include this ONLY if the slot is for a specific year. Omit or set null if for all.
+      "division": "A", // Include this ONLY if the slot is for a specific division. Omit or set null if for all.
+      "batch": "B1" // Include this ONLY if the slot is for a specific batch. Omit or set null if for all.
     }
   ]
 }

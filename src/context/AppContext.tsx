@@ -19,6 +19,7 @@ interface AppContextType {
   setTimetable: (slots: TimeSlot[]) => void;
   setUserBatch: (batch: string) => void;
   setUserYear: (year: string) => void;
+  setUserDivision: (division: string) => void;
   setUserField: (field: string) => void;
   setUserSemester: (semester: string) => void;
   completeSetup: () => void;
@@ -57,6 +58,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setTimetable = (timetable: TimeSlot[]) => setState((s) => ({ ...s, timetable }));
   const setUserBatch = (batch: string) => setState((s) => ({ ...s, userBatch: batch }));
   const setUserYear = (year: string) => setState((s) => ({ ...s, userYear: year }));
+  const setUserDivision = (division: string) => setState((s) => ({ ...s, userDivision: division }));
   const setUserField = (field: string) => setState((s) => ({ ...s, userField: field }));
   const setUserSemester = (semester: string) => setState((s) => ({ ...s, userSemester: semester }));
   const completeSetup = () => setState((s) => ({ ...s, isSetupComplete: true }));
@@ -115,6 +117,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       user: s.user,
       userField: s.userField,
       userYear: s.userYear,
+      userDivision: s.userDivision,
       userBatch: s.userBatch,
       userSemester: s.userSemester,
     }));
@@ -141,6 +144,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTimetable,
         setUserBatch,
         setUserYear,
+        setUserDivision,
         setUserField,
         setUserSemester,
         completeSetup,

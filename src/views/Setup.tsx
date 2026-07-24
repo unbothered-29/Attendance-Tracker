@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
-import { UploadCloud, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { generateId } from '../lib/utils';
 import { Subject, TimeSlot } from '../types';
 import { TimePicker12 } from '../components/TimePicker12';
@@ -13,7 +13,7 @@ import { TimePicker12 } from '../components/TimePicker12';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function Setup() {
-  const { state, setSubjects, setTimetable, setAttendanceGoal, setUserBatch, setUserYear, setUserField, setUserSemester, completeSetup } = useAppContext();
+  const { state, setSubjects, setTimetable, setAttendanceGoal, setUserBatch, setUserYear, setUserDivision, setUserField, setUserSemester, completeSetup } = useAppContext();
   
   const [step, setStep] = useState<1 | 2>(1); // 1: Upload, 2: Review/Edit
   const [isProcessing, setIsProcessing] = useState(false);
@@ -21,10 +21,14 @@ export function Setup() {
   
   const [goal, setGoal] = useState(state.attendanceGoal ? String(state.attendanceGoal) : '75');
   const [rawSubjects, setRawSubjects] = useState<{ id: string; name: string; teacher?: string }[]>([]);
-  const [rawSlots, setRawSlots] = useState<{ id: string; subjectId: string; start: string; end: string; dayOfWeek: number; batch?: string }[]>([]);
+  const [rawSlots, setRawSlots] = useState<{ id: string; subjectId: string; start: string; end: string; dayOfWeek: number; batch?: string; year?: string; division?: string; }[]>([]);
   const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [availableDivisions, setAvailableDivisions] = useState<string[]>([]);
+  
   const [selectedBatch, setSelectedBatch] = useState<string>(state.userBatch || '');
   const [selectedYear, setSelectedYear] = useState<string>(state.userYear || 'FE');
+  const [selectedDivision, setSelectedDivision] = useState<string>(state.userDivision || '');
   const [selectedField, setSelectedField] = useState<string>(state.userField || 'Engineering');
   const [selectedSemester, setSelectedSemester] = useState<string>(state.userSemester || '1');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +62,15 @@ export function Setup() {
           if (data.batches && data.batches.length > 0) {
             setAvailableBatches(data.batches);
             setSelectedBatch(data.batches[0]);
+          }
+          if (data.years && data.years.length > 0) {
+            setAvailableYears(data.years);
+            if (data.years.includes('FE')) setSelectedYear('FE');
+            else setSelectedYear(data.years[0]);
+          }
+          if (data.divisions && data.divisions.length > 0) {
+            setAvailableDivisions(data.divisions);
+            setSelectedDivision(data.divisions[0]);
           }
           setStep(2);
         } catch (err: any) {
@@ -115,16 +128,19 @@ export function Setup() {
       return;
     }
     
-    // Filter slots by selected batch (include if slot has no batch, or if it matches the selected batch)
-    const finalSlots = rawSlots.filter(s => !s.batch || !selectedBatch || s.batch === selectedBatch);
-    
     setSubjects(rawSubjects);
-    setTimetable(finalSlots);
+    setTimetable(rawSlots);
     setAttendanceGoal(Number(goal) || 75);
+    
     if (selectedBatch) {
       setUserBatch(selectedBatch);
     }
-    setUserYear(selectedYear);
+    if (selectedYear) {
+      setUserYear(selectedYear);
+    }
+    if (selectedDivision) {
+      setUserDivision(selectedDivision);
+    }
     setUserField(selectedField);
     setUserSemester(selectedSemester);
     completeSetup();
@@ -132,11 +148,12 @@ export function Setup() {
 
   if (step === 1) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Setup Timetable</CardTitle>
-            <p className="text-sm text-gray-400 mt-2">
+      <div className="min-h-screen flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent blur-3xl -z-10" />
+        <Card className="w-full max-w-lg shadow-2xl">
+          <CardHeader className="text-center pb-8">
+            <CardTitle className="text-4xl font-display font-bold tracking-tight bg-gradient-to-br from-white to-purple-300 bg-clip-text text-transparent">Setup Timetable</CardTitle>
+            <p className="text-base text-gray-400 mt-3">
               Upload a clear photo of your timetable, or enter it manually.
             </p>
           </CardHeader>
@@ -182,9 +199,14 @@ export function Setup() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Review & Edit</h1>
-        <p className="text-gray-400 mt-1">Review the extracted data and fix any mistakes before continuing.</p>
+      <div className="flex items-start sm:items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => setStep(1)} className="text-gray-400 hover:text-white shrink-0 mt-1 sm:mt-0">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Review & Edit</h1>
+          <p className="text-gray-400 mt-1">Review the extracted data and fix any mistakes before continuing.</p>
+        </div>
       </div>
 
       {error && <div className="bg-red-500/10 text-red-400 p-3 rounded-lg border border-red-500/20 text-sm">{error}</div>}
@@ -200,7 +222,7 @@ export function Setup() {
           <CardContent className="space-y-3">
             {rawSubjects.length === 0 && <p className="text-sm text-gray-500">No subjects added.</p>}
             {rawSubjects.map(sub => (
-              <div key={sub.id} className="flex flex-col md:flex-row gap-2 bg-[#120919] p-2 rounded-lg border border-purple-500/10">
+              <div key={sub.id} className="flex flex-col md:flex-row gap-2 bg-white/5 p-2 rounded-lg border border-purple-500/10">
                 <Input 
                   value={sub.name} 
                   onChange={(e) => updateSubject(sub.id, 'name', e.target.value)} 
@@ -238,10 +260,10 @@ export function Setup() {
             </div>
             
             {availableBatches.length > 0 && (
-              <div className="space-y-2 border-t border-purple-900/30 pt-4">
+              <div className="space-y-2 border-t border-white/5 pt-4">
                 <Label>Your Batch</Label>
                 <select 
-                  className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-[#120919] px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                  className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
                   value={selectedBatch}
                   onChange={(e) => setSelectedBatch(e.target.value)}
                 >
@@ -252,10 +274,10 @@ export function Setup() {
               </div>
             )}
 
-            <div className="space-y-2 border-t border-purple-900/30 pt-4">
+            <div className="space-y-2 border-t border-white/5 pt-4">
               <Label>Field of Study</Label>
               <select 
-                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-[#120919] px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
                 value={selectedField}
                 onChange={(e) => setSelectedField(e.target.value)}
               >
@@ -269,10 +291,10 @@ export function Setup() {
               </select>
             </div>
 
-            <div className="space-y-2 border-t border-purple-900/30 pt-4">
+            <div className="space-y-2 border-t border-white/5 pt-4">
               <Label>Year of Study</Label>
               <select 
-                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-[#120919] px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
               >
@@ -280,14 +302,35 @@ export function Setup() {
                 <option value="SE">Second Year (SE)</option>
                 <option value="TE">Third Year (TE)</option>
                 <option value="BE">Fourth Year (BE)</option>
+                {availableYears.filter(y => !['FE', 'SE', 'TE', 'BE'].includes(y)).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
                 <option value="Other">Other</option>
               </select>
             </div>
 
-            <div className="space-y-2 border-t border-purple-900/30 pt-4">
+            <div className="space-y-2 border-t border-white/5 pt-4">
+              <Label>Division</Label>
+              <select 
+                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                value={selectedDivision}
+                onChange={(e) => setSelectedDivision(e.target.value)}
+              >
+                <option value="">No Division / All Divisions</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                {availableDivisions.filter(d => !['A', 'B', 'C', 'D'].includes(d)).map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2 border-t border-white/5 pt-4">
               <Label>Current Semester</Label>
               <select 
-                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-[#120919] px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                className="flex h-10 w-full rounded-lg border border-purple-500/20 bg-white/5 px-3 py-2 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
                 value={selectedSemester}
                 onChange={(e) => setSelectedSemester(e.target.value)}
               >
@@ -324,7 +367,7 @@ export function Setup() {
            ) : (
              <div className="space-y-3">
                {rawSlots.map(slot => (
-                 <div key={slot.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-[#120919] p-2 rounded-lg border border-purple-500/10">
+                 <div key={slot.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white/5 p-2 rounded-lg border border-purple-500/10">
                    <select 
                      className="h-10 rounded-lg border border-purple-500/20 bg-transparent px-3 py-2 text-sm text-gray-200 focus:outline-none flex-1 min-w-[120px]"
                      value={slot.subjectId}
