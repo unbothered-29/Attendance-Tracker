@@ -25,7 +25,7 @@ export interface AttendanceRecord {
   id: string;
   date: string; // YYYY-MM-DD
   slotId: string;
-  status: 'attended' | 'skipped';
+  status: 'attended' | 'skipped' | 'cancelled';
 }
 
 export interface AppState {

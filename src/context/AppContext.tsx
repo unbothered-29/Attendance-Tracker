@@ -24,7 +24,7 @@ interface AppContextType {
   setUserSemester: (semester: string) => void;
   completeSetup: () => void;
   toggleOffDay: (date: string) => void;
-  markAttendance: (date: string, slotId: string, status: 'attended' | 'skipped') => void;
+  markAttendance: (date: string, slotId: string, status: 'attended' | 'skipped' | 'cancelled') => void;
   removeAttendance: (date: string, slotId: string) => void;
   updateTimetableSlot: (slot: TimeSlot) => void;
   updateDailySlotOverride: (date: string, slot: TimeSlot) => void;
@@ -73,7 +73,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const markAttendance = (date: string, slotId: string, status: 'attended' | 'skipped') => {
+  const markAttendance = (date: string, slotId: string, status: 'attended' | 'skipped' | 'cancelled') => {
     setState((s) => {
       const key = `${date}_${slotId}`;
       const newLog = { ...s.attendanceLog };

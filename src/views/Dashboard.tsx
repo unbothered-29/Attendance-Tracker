@@ -4,7 +4,7 @@ import { NATIONAL_HOLIDAYS, cn, formatTime12 } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { format, addDays, startOfWeek, isSameDay, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, endOfWeek } from 'date-fns';
-import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus } from 'lucide-react';
+import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus, Calendar, MinusCircle } from 'lucide-react';
 import { Subject, TimeSlot, User } from '../types';
 import { TimePicker12 } from '../components/TimePicker12';
 
@@ -128,9 +128,11 @@ export function Dashboard() {
       const slot = filteredTimetable.find(s => s.id === log.slotId);
       if (slot && res[slot.subjectId]) {
         const type = slot.batch ? 'practical' : 'lecture';
-        res[slot.subjectId][type].total += 1;
-        if (log.status === 'attended') {
-          res[slot.subjectId][type].attended += 1;
+        if (log.status !== 'cancelled') {
+          res[slot.subjectId][type].total += 1;
+          if (log.status === 'attended') {
+            res[slot.subjectId][type].attended += 1;
+          }
         }
       }
     });
@@ -139,11 +141,27 @@ export function Dashboard() {
   }, [state.attendanceLog, state.subjects, filteredTimetable, state.markedOffDays]);
 
   const [selectedSlotInfo, setSelectedSlotInfo] = useState<{ slot: TimeSlot, dateStr: string } | null>(null);
+  const [selectedDayAction, setSelectedDayAction] = useState<{ dateStr: string, date: Date, slots: TimeSlot[] } | null>(null);
   const [isEditingSlot, setIsEditingSlot] = useState(false);
   const [editSlotData, setEditSlotData] = useState<TimeSlot | null>(null);
   const [showConfirmSemester, setShowConfirmSemester] = useState(false);
 
   const getSubjectName = (id: string) => state.subjects.find(s => s.id === id)?.name || 'Unknown';
+
+  const handleDayMark = (status: 'attended' | 'skipped' | 'cancelled') => {
+    if (!selectedDayAction) return;
+    const { dateStr, slots } = selectedDayAction;
+    slots.forEach(slot => {
+      markAttendance(dateStr, slot.id, status);
+    });
+    setSelectedDayAction(null);
+  };
+
+  const handleDayHolidayToggle = () => {
+    if (!selectedDayAction) return;
+    toggleOffDay(selectedDayAction.dateStr);
+    setSelectedDayAction(null);
+  };
 
   const handleSlotClick = (slot: TimeSlot, dateStr: string) => {
     setSelectedSlotInfo({ slot, dateStr });
@@ -151,7 +169,7 @@ export function Dashboard() {
     setEditSlotData({ ...slot });
   };
 
-  const handleMark = (status: 'attended' | 'skipped') => {
+  const handleMark = (status: 'attended' | 'skipped' | 'cancelled') => {
     if (!selectedSlotInfo) return;
     const { slot, dateStr } = selectedSlotInfo;
     const key = `${dateStr}_${slot.id}`;
@@ -228,22 +246,23 @@ export function Dashboard() {
         </div>
       </header>
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="space-y-12">
         
-        {/* Left Col: Timetable Grid & Calendar */}
-        <div className="lg:col-span-2 space-y-8">
+        {/* Timetable Grid & Calendar */}
+        <div className="space-y-8">
           
           <Card>
             <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 gap-4 sm:gap-0">
               <div className="text-lg font-medium text-purple-300 sm:w-1/3">
                 <button 
-                  className="hover:text-purple-200 hover:underline transition-colors focus:outline-none"
+                  className="flex items-center gap-2 hover:text-purple-200 hover:bg-white/5 py-1 px-3 rounded-lg transition-colors focus:outline-none"
                   onClick={() => {
                     setCalendarViewDate(currentDate);
                     setShowCalendarModal(true);
                   }}
                   title="Open Calendar"
                 >
+                  <Calendar className="w-5 h-5" />
                   {format(currentDate, 'MMMM yyyy')}
                 </button>
               </div>
@@ -271,15 +290,19 @@ export function Dashboard() {
                           isToday ? "bg-purple-500/20 border-purple-500/50 shadow-purple-500/10" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04]",
                           isHoliday && "opacity-50 border-dashed hover:opacity-80"
                         )}
-                        onClick={() => toggleOffDay(dateStr)}
-                        title={isHoliday ? "Marked as Holiday (Click to unmark)" : "Click to mark as Holiday/Off"}
+                        onClick={() => setSelectedDayAction({
+                          dateStr,
+                          date,
+                          slots: filteredTimetable.filter(t => t.dayOfWeek === date.getDay())
+                        })}
+                        title="Click to manage day"
                         >
                           <div className={cn("text-xs uppercase font-bold tracking-wider", isToday ? "text-purple-300" : "text-gray-500")}>{DAYS[date.getDay()]}</div>
                           <div className={cn("text-2xl font-display font-bold mt-1", isToday ? "text-white" : "text-gray-200")}>
                             {format(date, 'd')}
                           </div>
                           <div className="text-[10px] text-gray-400 mt-0.5">{format(date, 'MMM yyyy')}</div>
-                          {isHoliday && <div className="text-[10px] text-purple-400 mt-2 flex items-center justify-center font-medium bg-purple-500/10 py-1 mx-2 rounded"><CalendarOff className="w-3 h-3 mr-1"/> Off Day</div>}
+                          {isHoliday && <div className="text-[10px] text-purple-400 mt-2 flex items-center justify-center font-medium bg-purple-500/10 py-1 mx-2 rounded"><CalendarOff className="w-3 h-3 mr-1"/> Holiday</div>}
                         </div>
                         
                         {/* Slots for this day */}
@@ -316,6 +339,7 @@ export function Dashboard() {
                                   className={cn(
                                     "p-3 rounded-xl text-left text-sm cursor-pointer border transition-all relative overflow-hidden flex flex-col justify-between shadow-sm group",
                                     status === 'holiday' ? "bg-white/[0.02] border-white/10 border-dashed opacity-50 pointer-events-none" :
+                                    status === 'cancelled' ? "bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50 hover:bg-gray-500/20" :
                                     status === 'attended' ? "bg-green-500/10 border-green-500/30 hover:border-green-500/50 hover:bg-green-500/20" :
                                     status === 'skipped' ? "bg-red-500/10 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/20" :
                                     "bg-white/[0.03] border-white/10 hover:border-purple-500/40 hover:bg-white/[0.06]"
@@ -331,6 +355,7 @@ export function Dashboard() {
                                   
                                   {status === 'attended' && <CheckCircle2 className="w-4 h-4 text-green-400 absolute top-3 right-3 opacity-80" />}
                                   {status === 'skipped' && <XCircle className="w-4 h-4 text-red-400 absolute top-3 right-3 opacity-80" />}
+                                  {status === 'cancelled' && <MinusCircle className="w-4 h-4 text-gray-400 absolute top-3 right-3 opacity-80" />}
                                   {!status && <div className="absolute top-3 right-3 w-4 h-4 rounded-full border border-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />}
                                 </div>
                               );
@@ -345,14 +370,16 @@ export function Dashboard() {
           </Card>
         </div>
 
-        {/* Right Col: Stats */}
+        {/* Stats Section */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Attendance Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {state.subjects.filter(subject => filteredTimetable.some(t => t.subjectId === subject.id)).length === 0 && <p className="text-sm text-gray-500">No subjects tracked.</p>}
+          <div>
+            <h2 className="text-2xl font-display font-bold text-white">Attendance Stats</h2>
+            <p className="text-gray-400 text-sm mt-1">Track your progress and attendance goals across all subjects.</p>
+          </div>
+          
+          {state.subjects.filter(subject => filteredTimetable.some(t => t.subjectId === subject.id)).length === 0 && <p className="text-sm text-gray-500">No subjects tracked.</p>}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {state.subjects.filter(subject => filteredTimetable.some(t => t.subjectId === subject.id)).map(subject => {
                 const s = stats[subject.id];
                 const totalAttended = s ? s.lecture.attended + s.practical.attended : 0;
@@ -449,10 +476,61 @@ export function Dashboard() {
                   </div>
                 );
               })}
+          </div>
+        </div>
+      </div>
+
+      {/* Modal / Popup for Day Action */}
+      {selectedDayAction && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-sm shadow-2xl border-purple-500/30 animate-in fade-in zoom-in duration-200">
+            <CardHeader>
+              <CardTitle>Manage Day</CardTitle>
+              <p className="text-sm text-gray-400">{format(selectedDayAction.date, 'EEEE, MMM do')}</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                className="w-full justify-start h-12" 
+                onClick={() => handleDayMark('attended')}
+                variant="outline"
+              >
+                <CheckCircle2 className="w-5 h-5 mr-3 text-green-400" />
+                Mark all as Attended
+              </Button>
+              <Button 
+                className="w-full justify-start h-12" 
+                onClick={() => handleDayMark('skipped')}
+                variant="outline"
+              >
+                <XCircle className="w-5 h-5 mr-3 text-red-400" />
+                Mark all as Skipped
+              </Button>
+              <Button 
+                className="w-full justify-start h-12" 
+                onClick={() => handleDayMark('cancelled')}
+                variant="outline"
+              >
+                <MinusCircle className="w-5 h-5 mr-3 text-gray-400" />
+                Mark all as Cancelled
+              </Button>
+              <Button 
+                className="w-full justify-start h-12" 
+                variant="outline"
+                onClick={handleDayHolidayToggle}
+              >
+                <CalendarOff className="w-5 h-5 mr-3 text-purple-400" />
+                {NATIONAL_HOLIDAYS.includes(selectedDayAction.dateStr) || state.markedOffDays.includes(selectedDayAction.dateStr) 
+                  ? 'Unmark as Public Holiday' 
+                  : 'Mark as Public Holiday'
+                }
+              </Button>
+              <div className="pt-2 flex justify-end">
+                <Button variant="ghost" onClick={() => setSelectedDayAction(null)}>Cancel</Button>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
 
       {/* Modal / Popup for Slot Action */}
       {/* Confirm Semester Modal */}
@@ -762,6 +840,14 @@ export function Dashboard() {
                   >
                     <XCircle className="w-5 h-5 mr-3" />
                     Mark as Skipped
+                  </Button>
+                  <Button 
+                    className="w-full justify-start h-12" 
+                    variant={getSlotStatus(selectedSlotInfo.dateStr, selectedSlotInfo.slot.id) === 'cancelled' ? 'secondary' : 'outline'}
+                    onClick={() => handleMark('cancelled')}
+                  >
+                    <MinusCircle className="w-5 h-5 mr-3" />
+                    Lecture Cancelled
                   </Button>
                   <Button 
                     className="w-full justify-start h-12" 
