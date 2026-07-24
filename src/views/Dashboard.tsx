@@ -846,7 +846,7 @@ export function Dashboard() {
                     variant={getSlotStatus(selectedSlotInfo.dateStr, selectedSlotInfo.slot.id) === 'cancelled' ? 'warning' : 'outline'}
                     onClick={() => handleMark('cancelled')}
                   >
-                    <MinusCircle className="w-5 h-5 mr-3 text-purple-400" />
+                    <MinusCircle className="w-5 h-5 mr-3" />
                     Lecture Cancelled
                   </Button>
                   <Button 
