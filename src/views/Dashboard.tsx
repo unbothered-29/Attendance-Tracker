@@ -339,7 +339,7 @@ export function Dashboard() {
                                   className={cn(
                                     "p-3 rounded-xl text-left text-sm cursor-pointer border transition-all relative overflow-hidden flex flex-col justify-between shadow-sm group",
                                     status === 'holiday' ? "bg-white/[0.02] border-white/10 border-dashed opacity-50 pointer-events-none" :
-                                    status === 'cancelled' ? "bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50 hover:bg-gray-500/20" :
+                                    status === 'cancelled' ? "bg-yellow-500/10 border-yellow-500/30 hover:border-yellow-500/50 hover:bg-yellow-500/20" :
                                     status === 'attended' ? "bg-green-500/10 border-green-500/30 hover:border-green-500/50 hover:bg-green-500/20" :
                                     status === 'skipped' ? "bg-red-500/10 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/20" :
                                     "bg-white/[0.03] border-white/10 hover:border-purple-500/40 hover:bg-white/[0.06]"
@@ -355,7 +355,7 @@ export function Dashboard() {
                                   
                                   {status === 'attended' && <CheckCircle2 className="w-4 h-4 text-green-400 absolute top-3 right-3 opacity-80" />}
                                   {status === 'skipped' && <XCircle className="w-4 h-4 text-red-400 absolute top-3 right-3 opacity-80" />}
-                                  {status === 'cancelled' && <MinusCircle className="w-4 h-4 text-gray-400 absolute top-3 right-3 opacity-80" />}
+                                  {status === 'cancelled' && <MinusCircle className="w-4 h-4 text-yellow-400 absolute top-3 right-3 opacity-80" />}
                                   {!status && <div className="absolute top-3 right-3 w-4 h-4 rounded-full border border-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />}
                                 </div>
                               );
@@ -510,7 +510,7 @@ export function Dashboard() {
                 onClick={() => handleDayMark('cancelled')}
                 variant="outline"
               >
-                <MinusCircle className="w-5 h-5 mr-3 text-gray-400" />
+                <MinusCircle className="w-5 h-5 mr-3 text-purple-400" />
                 Mark all as Cancelled
               </Button>
               <Button 
@@ -828,7 +828,7 @@ export function Dashboard() {
                   <Button 
                     className="w-full justify-start h-12" 
                     onClick={() => handleMark('attended')}
-                    variant={getSlotStatus(selectedSlotInfo.dateStr, selectedSlotInfo.slot.id) === 'attended' ? 'default' : 'outline'}
+                    variant={getSlotStatus(selectedSlotInfo.dateStr, selectedSlotInfo.slot.id) === 'attended' ? 'success' : 'outline'}
                   >
                     <CheckCircle2 className="w-5 h-5 mr-3" />
                     Mark as Attended
@@ -843,10 +843,10 @@ export function Dashboard() {
                   </Button>
                   <Button 
                     className="w-full justify-start h-12" 
-                    variant={getSlotStatus(selectedSlotInfo.dateStr, selectedSlotInfo.slot.id) === 'cancelled' ? 'secondary' : 'outline'}
+                    variant={getSlotStatus(selectedSlotInfo.dateStr, selectedSlotInfo.slot.id) === 'cancelled' ? 'warning' : 'outline'}
                     onClick={() => handleMark('cancelled')}
                   >
-                    <MinusCircle className="w-5 h-5 mr-3" />
+                    <MinusCircle className="w-5 h-5 mr-3 text-purple-400" />
                     Lecture Cancelled
                   </Button>
                   <Button 
