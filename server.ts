@@ -12,7 +12,7 @@ async function startServer() {
 
   app.post("/api/parse-timetable", async (req, res) => {
     try {
-      const { imageBase64 } = req.body;
+      const { imageBase64, profile } = req.body;
       if (!imageBase64) {
         return res.status(400).json({ error: "No image provided" });
       }
@@ -23,13 +23,18 @@ async function startServer() {
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
-      const prompt = `
-Extract the timetable schedule from this image.
+      const prompt = `Extract the timetable schedule from this image.
+The user's profile is:
+- Year: ${profile?.year || 'Any'}
+- Division: ${profile?.division || 'Any'}
+- Batch: ${profile?.batch || 'Any'}
+- Field: ${profile?.field || 'Any'}
+- Semester: ${profile?.semester || 'Any'}
+
+Extract ONLY the subjects and slots that apply to this specific profile. Ignore classes for other divisions, batches, or years.
+
 Return ONLY valid JSON matching this schema, without any markdown formatting or code blocks:
 {
-  "years": ["FE", "SE", "TE", "BE"], // List of years if the timetable specifies them. Empty array if not applicable.
-  "divisions": ["A", "B", "C"], // List of divisions if the timetable specifies them. Empty array if not applicable.
-  "batches": ["B1", "B2"], // List of batch names if the timetable has batch-specific slots (e.g. practicals). Empty array if no batches.
   "subjects": [{"id": "sub_1", "name": "Subject Name", "teacher": "Teacher Name (if available)"}],
   "slots": [
     {
@@ -37,20 +42,14 @@ Return ONLY valid JSON matching this schema, without any markdown formatting or 
       "subjectId": "sub_1",
       "start": "09:00",
       "end": "10:00",
-      "dayOfWeek": 1, // 0=Sun, 1=Mon, 2=Tue, etc.
-      "year": "FE", // Include this ONLY if the slot is for a specific year. Omit or set null if for all.
-      "division": "A", // Include this ONLY if the slot is for a specific division. Omit or set null if for all.
-      "batch": "B1" // Include this ONLY if the slot is for a specific batch. Omit or set null if for all.
+      "dayOfWeek": 1 // 0=Sun, 1=Mon, 2=Tue, etc.
     }
   ]
 }
+
 Notes:
-- Use 24-hour time format for start and end (e.g. 14:30). We will format it to 12-hour on the frontend.
-- Group the same subject under the same subjectId, even for practicals. For example, "Physics" and "Physics (Practical)" should both use the exact same subjectId so their attendance is calculated together.
-- Extract the teacher's name for each subject if visible.
-- If a subject name is abbreviated, try to extract it as written.
-- If times are not clearly visible, make your best guess based on the structure.
-`;
+- Use 24-hour time format for start and end (e.g. 14:30).
+- Group the same subject under the same subjectId.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-flash-latest",
@@ -72,10 +71,10 @@ Notes:
       let responseText = response.text || "{}";
       
       // Clean up markdown block if present
-      if (responseText.startsWith("```json")) {
-        responseText = responseText.replace(/^```json\n/, "").replace(/\n```$/, "");
-      } else if (responseText.startsWith("```")) {
-        responseText = responseText.replace(/^```\n/, "").replace(/\n```$/, "");
+      if (responseText.startsWith("\`\`\`json")) {
+        responseText = responseText.replace(/^\`\`\`json\n/, "").replace(/\n\`\`\`$/, "");
+      } else if (responseText.startsWith("\`\`\`")) {
+        responseText = responseText.replace(/^\`\`\`\n/, "").replace(/\n\`\`\`$/, "");
       }
 
       const data = JSON.parse(responseText);
@@ -83,6 +82,73 @@ Notes:
     } catch (error: any) {
       console.error("Error parsing timetable:", error);
       res.status(500).json({ error: error.message || "Failed to parse timetable" });
+    }
+  });
+
+  app.post("/api/generate-timetable", async (req, res) => {
+    try {
+      const { profile } = req.body;
+      if (!profile) {
+        return res.status(400).json({ error: "No profile provided" });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Gemini API key is not configured" });
+      }
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Generate a realistic college timetable for a student with the following profile:
+- Year: ${profile.year}
+- Division: ${profile.division || 'A'}
+- Batch: ${profile.batch || 'B1'}
+- Field: ${profile.field}
+- Semester: ${profile.semester}
+
+Create a realistic weekly schedule (Monday to Friday, typically 9 AM to 4 PM, with appropriate gaps). Include 4-6 relevant subjects for this field and semester. Include a mix of lectures and practicals/labs if appropriate for the field.
+
+Return ONLY valid JSON matching this schema, without any markdown formatting or code blocks:
+{
+  "subjects": [{"id": "sub_1", "name": "Subject Name", "teacher": "Teacher Name"}],
+  "slots": [
+    {
+      "id": "slot_1",
+      "subjectId": "sub_1",
+      "start": "09:00",
+      "end": "10:00",
+      "dayOfWeek": 1 // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
+    }
+  ]
+}
+
+Notes:
+- Use 24-hour time format for start and end (e.g. 14:30).
+- Group the same subject under the same subjectId.
+- Provide a realistic 5-day schedule.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: [prompt],
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.7
+        }
+      });
+
+      let responseText = response.text || "{}";
+      
+      // Clean up markdown block if present
+      if (responseText.startsWith("\`\`\`json")) {
+        responseText = responseText.replace(/^\`\`\`json\n/, "").replace(/\n\`\`\`$/, "");
+      } else if (responseText.startsWith("\`\`\`")) {
+        responseText = responseText.replace(/^\`\`\`\n/, "").replace(/\n\`\`\`$/, "");
+      }
+
+      const data = JSON.parse(responseText);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Error generating timetable:", error);
+      res.status(500).json({ error: error.message || "Failed to generate timetable" });
     }
   });
 
