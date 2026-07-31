@@ -470,7 +470,7 @@ export function Setup() {
                                value={slot.subjectId}
                                onChange={(e) => updateSlot(slot.id, 'subjectId', e.target.value)}
                              >
-                               {rawSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                               {rawSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.teacher ? `(${s.teacher})` : ''}</option>)}
                              </select>
                              <Button size="icon" variant="ghost" onClick={() => removeSlot(slot.id)} className="sm:hidden text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0">
                                <Trash2 className="w-4 h-4" />
@@ -505,7 +505,7 @@ export function Setup() {
 
       <div className="flex justify-end pt-4">
         <Button size="lg" onClick={handleSave} className="w-full md:w-auto px-8">
-          Complete Setup
+          Generate Timetable
         </Button>
       </div>
     </div>

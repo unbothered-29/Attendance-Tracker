@@ -822,6 +822,9 @@ export function Dashboard() {
               <>
                 <CardHeader>
                   <CardTitle>{getSubjectName(selectedSlotInfo.slot.subjectId)}</CardTitle>
+                  {state.subjects.find(s => s.id === selectedSlotInfo.slot.subjectId)?.teacher && (
+                    <p className="text-sm text-purple-300 font-medium">{state.subjects.find(s => s.id === selectedSlotInfo.slot.subjectId)?.teacher}</p>
+                  )}
                   <p className="text-sm text-gray-400">{format(parseISO(selectedSlotInfo.dateStr), 'EEEE, MMM do')} • {formatTime12(selectedSlotInfo.slot.start)} - {formatTime12(selectedSlotInfo.slot.end)}</p>
                 </CardHeader>
                 <CardContent className="space-y-3">
