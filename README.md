@@ -77,7 +77,7 @@ Attendance-Tracker/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/Attendance-Tracker.git
+git clone https://github.com/<unbothered-29>/Attendance-Tracker.git
 cd Attendance-Tracker
 ```
 
