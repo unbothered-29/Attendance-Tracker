@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState, Subject, TimeSlot, User, AttendanceRecord } from '../types';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { AppState, Subject, TimeSlot, User } from '../types';
+import { auth, googleProvider, db } from '../lib/firebase';
+import { onAuthStateChanged, signInWithPopup, signInAnonymously, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const defaultState: AppState = {
   user: null,
@@ -13,7 +16,11 @@ const defaultState: AppState = {
 
 interface AppContextType {
   state: AppState;
-  login: (user: User) => void;
+  firebaseUser: FirebaseUser | null;
+  loadingAuth: boolean;
+  login: (user: User) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
   setAttendanceGoal: (goal: number) => void;
   setSubjects: (subjects: Subject[]) => void;
   setTimetable: (slots: TimeSlot[]) => void;
@@ -42,17 +49,150 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        console.error('Failed to parse state', e);
+        console.error('Failed to parse state from localStorage', e);
       }
     }
     return defaultState;
   });
 
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState<boolean>(true);
+  const isRemoteUpdate = useRef(false);
+
+  // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('attendance_app_state', JSON.stringify(state));
   }, [state]);
 
-  const login = (user: User) => setState((s) => ({ ...s, user }));
+  // Sync state changes to Firestore if user logged in
+  useEffect(() => {
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      return;
+    }
+    if (firebaseUser) {
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      setDoc(userDocRef, {
+        ...state,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => {
+        console.error('Failed to save state to Firestore:', err);
+      });
+    }
+  }, [state, firebaseUser]);
+
+  // Firebase auth state listener & Firestore real-time sync
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setLoadingAuth(false);
+
+      if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const unsubscribeDoc = onSnapshot(userDocRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            isRemoteUpdate.current = true;
+            setState((prev) => ({
+              ...prev,
+              user: {
+                uid: user.uid,
+                name: data.user?.name || user.displayName || prev.user?.name || 'Student',
+                email: data.user?.email || user.email || prev.user?.email || '',
+                college: data.user?.college || prev.user?.college || 'Not specified',
+              },
+              attendanceGoal: data.attendanceGoal ?? prev.attendanceGoal,
+              subjects: data.subjects ?? prev.subjects,
+              timetable: data.timetable ?? prev.timetable,
+              markedOffDays: data.markedOffDays ?? prev.markedOffDays,
+              attendanceLog: data.attendanceLog ?? prev.attendanceLog,
+              dailySlotOverrides: data.dailySlotOverrides ?? prev.dailySlotOverrides,
+              isSetupComplete: data.isSetupComplete ?? prev.isSetupComplete,
+              userBatch: data.userBatch ?? prev.userBatch,
+              userYear: data.userYear ?? prev.userYear,
+              userDivision: data.userDivision ?? prev.userDivision,
+              userField: data.userField ?? prev.userField,
+              userSemester: data.userSemester ?? prev.userSemester,
+              notes: data.notes ?? prev.notes,
+            }));
+          }
+        }, (err) => {
+          console.error('Error listening to user document:', err);
+        });
+
+        return () => unsubscribeDoc();
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  const login = async (user: User) => {
+    let currentFbUser = auth.currentUser;
+    if (!currentFbUser) {
+      try {
+        const res = await signInAnonymously(auth);
+        currentFbUser = res.user;
+      } catch (e) {
+        console.error('Anonymous sign in failed:', e);
+      }
+    }
+    
+    const updatedUser = { ...user, uid: currentFbUser?.uid };
+    setState((s) => ({ ...s, user: updatedUser }));
+
+    if (currentFbUser) {
+      const userDocRef = doc(db, 'users', currentFbUser.uid);
+      await setDoc(userDocRef, {
+        user: updatedUser,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      const userDocRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(userDocRef);
+
+      let userInfo: User = {
+        uid: user.uid,
+        name: user.displayName || 'Student',
+        email: user.email || '',
+        college: 'Not specified'
+      };
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.user) {
+          userInfo = { ...data.user, uid: user.uid };
+        }
+      }
+
+      setState((s) => ({ ...s, user: userInfo }));
+
+      await setDoc(userDocRef, {
+        user: userInfo,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    setState(defaultState);
+    localStorage.removeItem('attendance_app_state');
+  };
+
   const setAttendanceGoal = (attendanceGoal: number) => setState((s) => ({ ...s, attendanceGoal }));
   const setSubjects = (subjects: Subject[]) => setState((s) => ({ ...s, subjects }));
   const setTimetable = (timetable: TimeSlot[]) => setState((s) => ({ ...s, timetable }));
@@ -124,7 +264,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetData = () => {
-    setState(defaultState);
+    logout();
   };
 
   const setNote = (date: string, note: string) => {
@@ -138,7 +278,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider
       value={{
         state,
+        firebaseUser,
+        loadingAuth,
         login,
+        loginWithGoogle,
+        logout,
         setAttendanceGoal,
         setSubjects,
         setTimetable,

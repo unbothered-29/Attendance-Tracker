@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "User": {
+      "collectionName": "users",
+      "properties": [
+        { "name": "name", "type": "string" },
+        { "name": "email", "type": "string" },
+        { "name": "college", "type": "string" },
+        { "name": "attendanceGoal", "type": "number" },
+        { "name": "isSetupComplete", "type": "boolean" },
+        { "name": "userBatch", "type": "string" },
+        { "name": "userYear", "type": "string" },
+        { "name": "userDivision", "type": "string" },
+        { "name": "userField", "type": "string" },
+        { "name": "userSemester", "type": "string" }
+      ]
+    },
+    "Subject": {
+      "collectionName": "users/{userId}/subjects",
+      "properties": [
+        { "name": "name", "type": "string" },
+        { "name": "teacher", "type": "string" }
+      ]
+    },
+    "TimeSlot": {
+      "collectionName": "users/{userId}/timetable",
+      "properties": [
+        { "name": "subjectId", "type": "string" },
+        { "name": "start", "type": "string" },
+        { "name": "end", "type": "string" },
+        { "name": "dayOfWeek", "type": "number" },
+        { "name": "year", "type": "string" },
+        { "name": "division", "type": "string" },
+        { "name": "batch", "type": "string" }
+      ]
+    },
+    "AttendanceRecord": {
+      "collectionName": "users/{userId}/attendanceLog",
+      "properties": [
+        { "name": "date", "type": "string" },
+        { "name": "slotId", "type": "string" },
+        { "name": "status", "type": "string" }
+      ]
+    },
+    "MarkedOffDay": {
+      "collectionName": "users/{userId}/markedOffDays",
+      "properties": [
+        { "name": "date", "type": "string" }
+      ]
+    },
+    "Note": {
+      "collectionName": "users/{userId}/notes",
+      "properties": [
+        { "name": "date", "type": "string" },
+        { "name": "note", "type": "string" }
+      ]
+    }
+  },
+  "securityRules": [
+    {
+      "path": "users/{userId}",
+      "allow": {
+        "read": "request.auth != null && request.auth.uid == userId",
+        "write": "request.auth != null && request.auth.uid == userId"
+      }
+    },
+    {
+      "path": "users/{userId}/{document=**}",
+      "allow": {
+        "read": "request.auth != null && request.auth.uid == userId",
+        "write": "request.auth != null && request.auth.uid == userId"
+      }
+    }
+  ]
+}
