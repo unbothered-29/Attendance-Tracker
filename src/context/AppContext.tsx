@@ -221,7 +221,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.warn('Google sign-in popup was closed by the user.');
         return;
       }
+      if (error?.code === 'auth/unauthorized-domain') {
+        alert('This domain is not listed in your Firebase Authorized Domains. Please add ' + window.location.hostname + ' to Firebase Console -> Authentication -> Settings -> Authorized domains.');
+        return;
+      }
       console.error('Google sign-in error:', error);
+      alert(`Sign in error: ${error?.message || 'Failed to sign in'}`);
       throw error;
     }
   };

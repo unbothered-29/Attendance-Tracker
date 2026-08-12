@@ -1,12 +1,12 @@
 {
-  "projectId": "agile-yeti-gt8c4",
-  "appId": "1:187641779326:web:a0c6d97397bc4465b8742f",
-  "apiKey": "AIzaSyCMQfvmBv9JNBRY4djmpKZcx9_kyY1pooM",
-  "authDomain": "agile-yeti-gt8c4.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-collegeattendanc-b3ba163a-c95e-4c92-a656-2c88170a6015",
-  "storageBucket": "agile-yeti-gt8c4.firebasestorage.app",
-  "messagingSenderId": "187641779326",
-  "measurementId": "",
-  "oAuthClientId": "187641779326-9n1ofa2k2jhq8d2ah9l28aktqc4fo2n8.apps.googleusercontent.com",
+  "projectId": "attendance-tracker-4a0b8",
+  "appId": "1:100054999433:web:0391bf3b506b2d8f4d4158",
+  "apiKey": "AIzaSyAJKc0Ai9BJHE1MBbO2783JMJ8NBbXHbdk",
+  "authDomain": "attendance-tracker-4a0b8.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "attendance-tracker-4a0b8.firebasestorage.app",
+  "messagingSenderId": "100054999433",
+  "measurementId": "G-EWPCHF46CG",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }
