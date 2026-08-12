@@ -64,6 +64,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('attendance_app_state', JSON.stringify(state));
   }, [state]);
 
+  // Helper to remove undefined fields before sending to Firestore
+  const sanitizeForFirestore = (data: any) => {
+    return JSON.parse(JSON.stringify(data));
+  };
+
   // Sync state changes to Firestore if user logged in
   useEffect(() => {
     if (isRemoteUpdate.current) {
@@ -72,10 +77,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     if (firebaseUser) {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
-      setDoc(userDocRef, {
+      const dataToSave = sanitizeForFirestore({
         ...state,
         updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => {
+      });
+      setDoc(userDocRef, dataToSave, { merge: true }).catch(err => {
         console.error('Failed to save state to Firestore:', err);
       });
     }
@@ -83,48 +89,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Firebase auth state listener & Firestore real-time sync
   useEffect(() => {
+    let unsubscribeDoc: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+        unsubscribeDoc = null;
+      }
+
       setFirebaseUser(user);
       setLoadingAuth(false);
 
       if (user) {
         const userDocRef = doc(db, 'users', user.uid);
-        const unsubscribeDoc = onSnapshot(userDocRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data();
-            isRemoteUpdate.current = true;
-            setState((prev) => ({
-              ...prev,
-              user: {
-                uid: user.uid,
-                name: data.user?.name || user.displayName || prev.user?.name || 'Student',
-                email: data.user?.email || user.email || prev.user?.email || '',
-                college: data.user?.college || prev.user?.college || 'Not specified',
-              },
-              attendanceGoal: data.attendanceGoal ?? prev.attendanceGoal,
-              subjects: data.subjects ?? prev.subjects,
-              timetable: data.timetable ?? prev.timetable,
-              markedOffDays: data.markedOffDays ?? prev.markedOffDays,
-              attendanceLog: data.attendanceLog ?? prev.attendanceLog,
-              dailySlotOverrides: data.dailySlotOverrides ?? prev.dailySlotOverrides,
-              isSetupComplete: data.isSetupComplete ?? prev.isSetupComplete,
-              userBatch: data.userBatch ?? prev.userBatch,
-              userYear: data.userYear ?? prev.userYear,
-              userDivision: data.userDivision ?? prev.userDivision,
-              userField: data.userField ?? prev.userField,
-              userSemester: data.userSemester ?? prev.userSemester,
-              notes: data.notes ?? prev.notes,
-            }));
+        unsubscribeDoc = onSnapshot(
+          userDocRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              const data = snapshot.data();
+              isRemoteUpdate.current = true;
+              setState((prev) => ({
+                ...prev,
+                user: {
+                  uid: user.uid,
+                  name: data.user?.name || user.displayName || prev.user?.name || 'Student',
+                  username: data.user?.username || prev.user?.username || '',
+                  photoUrl: data.user?.photoUrl || user.photoURL || prev.user?.photoUrl || '',
+                  email: data.user?.email || user.email || prev.user?.email || '',
+                  college: data.user?.college || prev.user?.college || 'Not specified',
+                },
+                attendanceGoal: data.attendanceGoal ?? prev.attendanceGoal,
+                subjects: data.subjects ?? prev.subjects,
+                timetable: data.timetable ?? prev.timetable,
+                markedOffDays: data.markedOffDays ?? prev.markedOffDays,
+                attendanceLog: data.attendanceLog ?? prev.attendanceLog,
+                dailySlotOverrides: data.dailySlotOverrides ?? prev.dailySlotOverrides,
+                isSetupComplete: data.isSetupComplete ?? prev.isSetupComplete,
+                userBatch: data.userBatch ?? prev.userBatch,
+                userYear: data.userYear ?? prev.userYear,
+                userDivision: data.userDivision ?? prev.userDivision,
+                userField: data.userField ?? prev.userField,
+                userSemester: data.userSemester ?? prev.userSemester,
+                notes: data.notes ?? prev.notes,
+              }));
+            }
+          },
+          (err) => {
+            if (err.code === 'permission-denied') {
+              return;
+            }
+            console.error('Error listening to user document:', err);
           }
-        }, (err) => {
-          console.error('Error listening to user document:', err);
-        });
-
-        return () => unsubscribeDoc();
+        );
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+      }
+      unsubscribeAuth();
+    };
   }, []);
 
   const login = async (user: User) => {
@@ -143,10 +168,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (currentFbUser) {
       const userDocRef = doc(db, 'users', currentFbUser.uid);
-      await setDoc(userDocRef, {
+      const dataToSave = sanitizeForFirestore({
         user: updatedUser,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      });
+      await setDoc(userDocRef, dataToSave, { merge: true });
     }
   };
 
@@ -173,11 +199,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setState((s) => ({ ...s, user: userInfo }));
 
-      await setDoc(userDocRef, {
+      const dataToSave = sanitizeForFirestore({
         user: userInfo,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
-    } catch (error) {
+      });
+
+      await setDoc(userDocRef, dataToSave, { merge: true });
+    } catch (error: any) {
+      if (
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request'
+      ) {
+        console.warn('Google sign-in popup was closed by the user.');
+        return;
+      }
       console.error('Google sign-in error:', error);
       throw error;
     }

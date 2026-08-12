@@ -64,7 +64,9 @@ export function Login() {
             <form onSubmit={handleSubmit} className="space-y-5 relative">
               <Button 
                 type="button" 
-                onClick={() => loginWithGoogle()}
+                onClick={() => {
+                  loginWithGoogle().catch(() => {});
+                }}
                 variant="outline"
                 className="w-full h-12 rounded-xl border-white/10 hover:bg-white/5 text-white text-sm font-medium transition-all flex items-center justify-center gap-3"
               >

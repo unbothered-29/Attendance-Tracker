@@ -4,7 +4,7 @@ import { NATIONAL_HOLIDAYS, cn, formatTime12 } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { format, addDays, startOfWeek, isSameDay, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, endOfWeek } from 'date-fns';
-import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus, Calendar, MinusCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus, Calendar, MinusCircle, Camera, Trash2, Check } from 'lucide-react';
 import { Subject, TimeSlot, User } from '../types';
 import { TimePicker12 } from '../components/TimePicker12';
 
@@ -27,9 +27,41 @@ export function Dashboard() {
   
   // Profile modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSavedSuccess, setProfileSavedSuccess] = useState(false);
+
+  const handleSaveProfile = () => {
+    setIsSavingProfile(true);
+    setTimeout(() => {
+      setIsSavingProfile(false);
+      setProfileSavedSuccess(true);
+      setTimeout(() => {
+        setProfileSavedSuccess(false);
+        setShowProfileModal(false);
+      }, 600);
+    }, 200);
+  };
   
   const [isUploadingTimetable, setIsUploadingTimetable] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      alert('Photo file size should be under 3MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const photoUrl = reader.result as string;
+      if (state.user) {
+        login({ ...state.user, photoUrl });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleAddTimetable = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -224,7 +256,7 @@ export function Dashboard() {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/5 pb-8 relative">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent blur-3xl -z-10 rounded-full" />
         <div>
-          <h1 className="text-4xl sm:text-5xl font-display font-bold tracking-tight bg-gradient-to-br from-white via-white to-purple-400 bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-5xl font-display font-bold tracking-tight bg-gradient-to-br from-white to-purple-300 bg-clip-text text-transparent">
             {state.user?.name}'s Dashboard
           </h1>
           <p className="text-gray-400 mt-2 flex flex-wrap items-center gap-2 text-sm sm:text-base">
@@ -235,14 +267,39 @@ export function Dashboard() {
             <span className="px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/20 text-green-300">Goal: {state.attendanceGoal}%</span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Today</Button>
-          <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10" onClick={() => setShowConfirmSemester(true)}>
-            New Semester
+        <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">
+          {/* User Profile Option - Top Right, larger */}
+          <Button 
+            variant="ghost" 
+            onClick={() => setShowProfileModal(true)} 
+            title="User Profile"
+            className="flex items-center gap-2.5 text-sm sm:text-base text-purple-100 hover:text-white bg-white/[0.06] hover:bg-purple-500/15 border border-purple-500/30 px-4 py-2.5 rounded-xl transition-all shadow-md hover:shadow-purple-900/20"
+          >
+            {state.user?.photoUrl ? (
+              <img src={state.user.photoUrl} alt="User Avatar" className="w-7 h-7 rounded-full object-cover border-2 border-purple-400/80 shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-purple-500/20 border border-purple-400/50 flex items-center justify-center shrink-0">
+                <UserIcon className="w-4 h-4 text-purple-300" />
+              </div>
+            )}
+            <span className="font-semibold tracking-wide">
+              {state.user?.username ? `@${state.user.username}` : state.user?.name || 'Profile'}
+            </span>
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setShowProfileModal(true)} title="Profile">
-            <UserIcon className="w-5 h-5 text-gray-400 hover:text-white" />
-          </Button>
+
+          {/* Today & New Semester in the same line */}
+          <div className="flex items-center gap-2.5">
+            <Button variant="outline" onClick={() => setCurrentDate(new Date())} className="h-9 px-3.5 text-xs sm:text-sm">
+              Today
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-9 px-3.5 text-xs sm:text-sm border-purple-500/50 text-purple-300 hover:bg-purple-500/10" 
+              onClick={() => setShowConfirmSemester(true)}
+            >
+              New Semester
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -568,34 +625,145 @@ export function Dashboard() {
       {showProfileModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
           <Card className="w-full max-w-md shadow-2xl border-purple-500/30 animate-in fade-in zoom-in duration-200 max-h-[95vh] flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between pb-4 shrink-0">
-              <CardTitle>Edit Profile</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowProfileModal(false)}>
-                <XCircle className="w-5 h-5 text-gray-400" />
-              </Button>
+            <CardHeader className="flex flex-row items-center justify-between pb-4 shrink-0 border-b border-white/10">
+              <CardTitle className="text-xl font-display font-bold text-white">User Profile</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveProfile}
+                  disabled={isSavingProfile}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-md"
+                >
+                  {profileSavedSuccess ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-green-300" />
+                      <span>Saved!</span>
+                    </>
+                  ) : isSavingProfile ? (
+                    <span>Saving...</span>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Save</span>
+                    </>
+                  )}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setShowProfileModal(false)}>
+                  <XCircle className="w-5 h-5 text-gray-400 hover:text-white" />
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4 overflow-y-auto flex-1">
-              {/* Not fully implemented yet - just basic user info rendering for now */}
+            <CardContent className="space-y-5 overflow-y-auto flex-1 pt-4">
+              
+              {/* Photo & Avatar Section */}
+              <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/10">
+                <div className="relative group">
+                  {state.user?.photoUrl ? (
+                    <img 
+                      src={state.user.photoUrl} 
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover border-2 border-purple-400 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-purple-500/10 border-2 border-purple-500/30 flex items-center justify-center text-purple-300">
+                      <UserIcon className="w-10 h-10" />
+                    </div>
+                  )}
+                  <button 
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 p-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg transition-transform hover:scale-105"
+                    title="Change Photo"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  ref={avatarInputRef}
+                  onChange={handleAvatarUpload}
+                />
+
+                <div className="flex items-center gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    className="text-xs text-purple-300 border-purple-500/30 hover:bg-purple-500/10 h-8"
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    <Camera className="w-3.5 h-3.5 mr-1.5" /> Upload Photo
+                  </Button>
+                  {state.user?.photoUrl && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8"
+                      onClick={() => login({ ...state.user!, photoUrl: '' })}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm text-purple-300">Name</label>
+                {/* Username */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-purple-300 uppercase tracking-wider">Username</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-400 text-sm">@</span>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-600"
+                      placeholder="username"
+                      defaultValue={state.user?.username || ''}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^@/, '');
+                        login({ ...state.user!, username: val });
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-purple-300 uppercase tracking-wider">Full Name</label>
                   <input 
-                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                    type="text"
+                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
                     defaultValue={state.user?.name}
                     onChange={(e) => login({ ...state.user!, name: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm text-purple-300">Field</label>
+
+                {/* College */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-purple-300 uppercase tracking-wider">College / University</label>
+                  <input 
+                    type="text"
+                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    defaultValue={state.user?.college || ''}
+                    onChange={(e) => login({ ...state.user!, college: e.target.value })}
+                  />
+                </div>
+
+                {/* Academic Grid */}
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-400">Field</label>
                     <input 
                       className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userField}
                       onChange={(e) => setUserField(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm text-purple-300">Year</label>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-400">Year</label>
                     <input 
                       className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userYear}
@@ -603,17 +771,18 @@ export function Dashboard() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm text-purple-300">Division</label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-400">Division</label>
                     <input 
                       className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userDivision}
                       onChange={(e) => setUserDivision(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm text-purple-300">Batch</label>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-400">Batch</label>
                     <input 
                       className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userBatch}
@@ -621,17 +790,18 @@ export function Dashboard() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm text-purple-300">Semester</label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-400">Semester</label>
                     <input 
                       className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
                       defaultValue={state.userSemester}
                       onChange={(e) => setUserSemester(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm text-purple-300">Goal (%)</label>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-400">Goal (%)</label>
                     <input 
                       type="number"
                       className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
@@ -640,7 +810,32 @@ export function Dashboard() {
                     />
                   </div>
                 </div>
-                <div className="pt-4 border-t border-white/5 space-y-3">
+
+                <div className="pt-4 border-t border-white/10 space-y-3">
+                  <Button 
+                    type="button" 
+                    onClick={handleSaveProfile}
+                    disabled={isSavingProfile}
+                    className="w-full bg-gradient-to-r from-purple-600 via-purple-500 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-900/40 transition-all text-sm"
+                  >
+                    {profileSavedSuccess ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-300 animate-in zoom-in" />
+                        <span>Profile Changes Saved!</span>
+                      </>
+                    ) : isSavingProfile ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Saving Changes...
+                      </span>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Save Profile Changes</span>
+                      </>
+                    )}
+                  </Button>
+
                   <input
                     type="file"
                     accept="image/*"
@@ -650,7 +845,7 @@ export function Dashboard() {
                   />
                   <Button 
                     variant="outline" 
-                    className="w-full text-purple-400 hover:text-purple-300" 
+                    className="w-full text-purple-400 hover:text-purple-300 border-purple-500/30" 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingTimetable}
                   >
