@@ -8,6 +8,7 @@ import { UploadCloud, FileText, Loader2, Plus, Trash2, ArrowLeft, Wand2 } from '
 import { generateId } from '../lib/utils';
 import { Subject, TimeSlot } from '../types';
 import { TimePicker12 } from '../components/TimePicker12';
+import { safeFetchApi } from '../lib/api';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -48,22 +49,16 @@ export function Setup() {
       reader.onload = async () => {
         const base64 = reader.result as string;
         try {
-          const res = await fetch("/api/parse-timetable", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              imageBase64: base64,
-              profile: {
-                year: selectedYear,
-                division: selectedDivision,
-                batch: selectedBatch,
-                field: selectedField,
-                semester: selectedSemester
-              }
-            })
+          const data = await safeFetchApi("/api/parse-timetable", { 
+            imageBase64: base64,
+            profile: {
+              year: selectedYear,
+              division: selectedDivision,
+              batch: selectedBatch,
+              field: selectedField,
+              semester: selectedSemester
+            }
           });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Failed to parse timetable");
 
           const subjects = (data.subjects || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
           const slots = (data.slots || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
@@ -94,21 +89,15 @@ export function Setup() {
     setIsProcessing(true);
     setError('');
     try {
-      const res = await fetch("/api/generate-timetable", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          profile: {
-            year: selectedYear,
-            division: selectedDivision,
-            batch: selectedBatch,
-            field: selectedField,
-            semester: selectedSemester
-          }
-        })
+      const data = await safeFetchApi("/api/generate-timetable", { 
+        profile: {
+          year: selectedYear,
+          division: selectedDivision,
+          batch: selectedBatch,
+          field: selectedField,
+          semester: selectedSemester
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate timetable");
 
       const subjects = (data.subjects || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
       const slots = (data.slots || []).map((s: any) => ({ ...s, id: s.id || generateId() }));

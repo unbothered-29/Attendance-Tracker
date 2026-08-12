@@ -7,6 +7,7 @@ import { format, addDays, startOfWeek, isSameDay, parseISO, startOfMonth, endOfM
 import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus, Calendar, MinusCircle, Camera, Trash2, Check } from 'lucide-react';
 import { Subject, TimeSlot, User } from '../types';
 import { TimePicker12 } from '../components/TimePicker12';
+import { safeFetchApi } from '../lib/api';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -106,13 +107,7 @@ export function Dashboard() {
       reader.onload = async () => {
         const base64 = reader.result as string;
         try {
-          const res = await fetch("/api/parse-timetable", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageBase64: base64 })
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Failed to parse timetable");
+          const data = await safeFetchApi("/api/parse-timetable", { imageBase64: base64 });
 
           const generateId = () => Math.random().toString(36).substr(2, 9);
           // Add new subjects
