@@ -49,7 +49,7 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-2.5-flash",
       contents: [prompt],
       config: {
         responseMimeType: "application/json",

@@ -57,7 +57,7 @@ Notes:
 - Group the same subject under the same subjectId.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-2.5-flash",
       contents: [
         prompt,
         {
