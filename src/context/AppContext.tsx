@@ -47,7 +47,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('attendance_app_state');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.user?.photoUrl && parsed.user.photoUrl.length > 150000) {
+          parsed.user.photoUrl = '';
+        }
+        return parsed;
       } catch (e) {
         console.error('Failed to parse state from localStorage', e);
       }
@@ -64,9 +68,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('attendance_app_state', JSON.stringify(state));
   }, [state]);
 
-  // Helper to remove undefined fields before sending to Firestore
+  // Helper to remove undefined fields and handle document payload limits before sending to Firestore
   const sanitizeForFirestore = (data: any) => {
-    return JSON.parse(JSON.stringify(data));
+    const cleaned = JSON.parse(JSON.stringify(data));
+    if (cleaned.user?.photoUrl && cleaned.user.photoUrl.length > 150000) {
+      delete cleaned.user.photoUrl;
+    }
+    return cleaned;
   };
 
   // Sync state changes to Firestore if user logged in
