@@ -21,7 +21,14 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API key is not configured" });
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ 
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
       
       const prompt = `Extract the timetable schedule from this image.
 The user's profile is:
@@ -52,7 +59,7 @@ Notes:
 - Group the same subject under the same subjectId.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: [
           prompt,
           {
@@ -107,7 +114,14 @@ Notes:
         return res.status(500).json({ error: "Gemini API key is not configured" });
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ 
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
       
       const prompt = `Generate a realistic college timetable for a student with the following profile:
 - Year: ${profile.year}
@@ -138,7 +152,7 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: [prompt],
         config: {
           responseMimeType: "application/json",

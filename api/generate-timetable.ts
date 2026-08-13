@@ -18,7 +18,14 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
     
     const prompt = `Generate a realistic college timetable for a student with the following profile:
 - Year: ${profile.year}
@@ -49,7 +56,7 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: [prompt],
       config: {
         responseMimeType: "application/json",

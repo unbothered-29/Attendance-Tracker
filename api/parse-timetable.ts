@@ -26,7 +26,14 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
     
     const prompt = `Extract the timetable schedule from this image.
 The user's profile is:
@@ -57,7 +64,7 @@ Notes:
 - Group the same subject under the same subjectId.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: [
         prompt,
         {
