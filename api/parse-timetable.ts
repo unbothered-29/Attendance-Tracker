@@ -65,16 +65,14 @@ Notes:
 
     const modelsToTry = [
       "gemini-3.6-flash",
-      "gemini-2.5-flash",
-      "gemini-3.6-pro",
-      "gemini-2.5-pro"
+      "gemini-3.1-pro"
     ];
 
     let response: any = null;
     let lastError: any = null;
 
     for (const model of modelsToTry) {
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           response = await ai.models.generateContent({
             model,
@@ -96,9 +94,15 @@ Notes:
         } catch (err: any) {
           lastError = err;
           const errStr = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+          
+          // If model is not found (404), break loop for this model and try next model
+          if (errStr.includes("404") || errStr.includes("NOT_FOUND") || errStr.includes("no longer available")) {
+            break;
+          }
+
           const isTransient = errStr.includes("503") || errStr.includes("UNAVAILABLE") || errStr.includes("high demand") || errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED");
-          if (!isTransient) throw err;
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          if (!isTransient && attempt > 0) throw err;
+          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
         }
       }
       if (response) break;
