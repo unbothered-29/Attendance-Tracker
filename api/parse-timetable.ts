@@ -68,52 +68,60 @@ Notes:
       "gemini-2.5-pro",
       "gemini-2.0-flash",
       "gemini-1.5-flash",
-      "gemini-1.5-pro",
-      "gemini-2.5-flash-lite",
-      "gemini-2.0-flash-lite",
-      "gemini-3.6-flash",
-      "gemini-3.1-pro"
+      "gemini-1.5-pro"
     ];
 
     let response: any = null;
+    let firstError: any = null;
     let lastError: any = null;
 
     for (const model of modelsToTry) {
-      try {
-        response = await ai.models.generateContent({
-          model,
-          contents: [
-            prompt,
-            {
-              inlineData: {
-                data: imageBase64.split(",")[1] || imageBase64,
-                mimeType: "image/jpeg"
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: [
+              prompt,
+              {
+                inlineData: {
+                  data: imageBase64.split(",")[1] || imageBase64,
+                  mimeType: "image/jpeg"
+                }
               }
+            ],
+            config: {
+              responseMimeType: "application/json",
+              temperature: 0.1
             }
-          ],
-          config: {
-            responseMimeType: "application/json",
-            temperature: 0.1
-          }
-        });
-        if (response) break;
-      } catch (err: any) {
-        lastError = err;
-        const errStr = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
-        console.warn(`Model ${model} failed:`, errStr);
+          });
+          if (response) break;
+        } catch (err: any) {
+          if (!firstError) firstError = err;
+          lastError = err;
+          const errStr = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+          console.warn(`Model ${model} attempt ${attempt + 1} failed:`, errStr);
 
-        if (
-          errStr.includes("401") ||
-          errStr.includes("UNAUTHENTICATED") ||
-          errStr.includes("invalid authentication credentials")
-        ) {
-          throw err;
+          if (
+            errStr.includes("401") ||
+            errStr.includes("UNAUTHENTICATED") ||
+            errStr.includes("invalid authentication credentials") ||
+            errStr.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+          ) {
+            throw err;
+          }
+
+          if (errStr.includes("404") || errStr.includes("NOT_FOUND") || errStr.includes("not found")) {
+            break;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
+      if (response) break;
     }
 
     if (!response) {
-      throw lastError || new Error("Failed after retries");
+      throw firstError || lastError || new Error("Failed to parse timetable schedule with available models.");
     }
 
     let responseText = response.text || "{}";
