@@ -32,7 +32,25 @@ export async function safeFetchApi(url: string, body: any) {
   }
 
   if (!res.ok) {
-    throw new Error(data.error || `Server error (${res.status})`);
+    let errMsg = "Server error";
+    if (typeof data.error === "string") {
+      errMsg = data.error;
+    } else if (data.error && typeof data.error === "object") {
+      errMsg = data.error.message || JSON.stringify(data.error);
+    } else if (data.message) {
+      errMsg = data.message;
+    }
+
+    if (
+      errMsg.includes("401") ||
+      errMsg.includes("UNAUTHENTICATED") ||
+      errMsg.includes("invalid authentication credentials") ||
+      errMsg.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+    ) {
+      errMsg = "Invalid Gemini API Key. Your GEMINI_API_KEY is missing or invalid. Please get a free API key from Google AI Studio (https://aistudio.google.com/app/apikey) and set GEMINI_API_KEY in Vercel Project Settings -> Environment Variables.";
+    }
+
+    throw new Error(errMsg);
   }
 
   return data;

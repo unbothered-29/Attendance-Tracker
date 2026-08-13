@@ -81,7 +81,18 @@ Notes:
       res.json(data);
     } catch (error: any) {
       console.error("Error parsing timetable:", error);
-      res.status(500).json({ error: error.message || "Failed to parse timetable" });
+      const errStr = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+      if (
+        errStr.includes("401") ||
+        errStr.includes("UNAUTHENTICATED") ||
+        errStr.includes("invalid authentication credentials") ||
+        errStr.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+      ) {
+        return res.status(401).json({ 
+          error: "Invalid Gemini API Key. Please obtain a valid Gemini API key from Google AI Studio (https://aistudio.google.com/app/apikey) and set GEMINI_API_KEY in your environment." 
+        });
+      }
+      res.status(500).json({ error: errStr || "Failed to parse timetable" });
     }
   });
 
@@ -148,7 +159,18 @@ Notes:
       res.json(data);
     } catch (error: any) {
       console.error("Error generating timetable:", error);
-      res.status(500).json({ error: error.message || "Failed to generate timetable" });
+      const errStr = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+      if (
+        errStr.includes("401") ||
+        errStr.includes("UNAUTHENTICATED") ||
+        errStr.includes("invalid authentication credentials") ||
+        errStr.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+      ) {
+        return res.status(401).json({ 
+          error: "Invalid Gemini API Key. Please obtain a valid Gemini API key from Google AI Studio (https://aistudio.google.com/app/apikey) and set GEMINI_API_KEY in your environment." 
+        });
+      }
+      res.status(500).json({ error: errStr || "Failed to generate timetable" });
     }
   });
 
