@@ -63,22 +63,50 @@ Notes:
 - Use 24-hour time format for start and end (e.g. 14:30).
 - Group the same subject under the same subjectId.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [
-        prompt,
-        {
-          inlineData: {
-            data: imageBase64.split(",")[1] || imageBase64,
-            mimeType: "image/jpeg"
-          }
+    const modelsToTry = [
+      "gemini-3.6-flash",
+      "gemini-2.5-flash",
+      "gemini-3.6-pro",
+      "gemini-2.5-pro"
+    ];
+
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const model of modelsToTry) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: [
+              prompt,
+              {
+                inlineData: {
+                  data: imageBase64.split(",")[1] || imageBase64,
+                  mimeType: "image/jpeg"
+                }
+              }
+            ],
+            config: {
+              responseMimeType: "application/json",
+              temperature: 0.1
+            }
+          });
+          if (response) break;
+        } catch (err: any) {
+          lastError = err;
+          const errStr = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+          const isTransient = errStr.includes("503") || errStr.includes("UNAVAILABLE") || errStr.includes("high demand") || errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED");
+          if (!isTransient) throw err;
+          await new Promise((resolve) => setTimeout(resolve, 800));
         }
-      ],
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.1
       }
-    });
+      if (response) break;
+    }
+
+    if (!response) {
+      throw lastError || new Error("Failed after retries");
+    }
 
     let responseText = response.text || "{}";
     

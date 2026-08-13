@@ -48,6 +48,14 @@ export async function safeFetchApi(url: string, body: any) {
       errMsg.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
     ) {
       errMsg = "Invalid Gemini API Key. Your GEMINI_API_KEY is missing or invalid. Please get a free API key from Google AI Studio (https://aistudio.google.com/app/apikey) and set GEMINI_API_KEY in Vercel Project Settings -> Environment Variables.";
+    } else if (
+      errMsg.includes("503") ||
+      errMsg.includes("UNAVAILABLE") ||
+      errMsg.includes("high demand") ||
+      errMsg.includes("429") ||
+      errMsg.includes("RESOURCE_EXHAUSTED")
+    ) {
+      errMsg = "Google AI models are currently experiencing temporary high demand traffic. Please wait a few seconds and try clicking again.";
     }
 
     throw new Error(errMsg);
