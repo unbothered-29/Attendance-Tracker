@@ -56,6 +56,7 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
     const modelsToTry = [
+      "gemini-3.6-flash",
       "gemini-2.5-flash",
       "gemini-2.5-pro",
       "gemini-2.0-flash",
