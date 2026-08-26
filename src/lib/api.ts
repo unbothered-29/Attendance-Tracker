@@ -7,7 +7,7 @@ export async function safeFetchApi(url: string, body: any) {
       body: JSON.stringify(body)
     });
   } catch (err: any) {
-    throw new Error(`Network error: ${err.message || "Failed to connect to server"}`);
+    throw new Error(`Network error: ${err.message || "Failed to connect to server. Please check your internet connection."}`);
   }
 
   const contentType = res.headers.get("content-type") || "";
@@ -23,12 +23,20 @@ export async function safeFetchApi(url: string, body: any) {
   }
 
   if (!data) {
-    if (res.status === 404 || rawText.includes("The page") || rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
+    if (res.status === 504 || rawText.includes("FUNCTION_INVOCATION_TIMEOUT") || rawText.includes("Gateway Timeout")) {
       throw new Error(
-        "Backend API not reached (404/HTML error page). Please ensure GEMINI_API_KEY is configured in Vercel Project Settings -> Environment Variables and redeploy."
+        "Request timed out while analyzing the image. We have auto-loaded standard subjects for your profile so you can proceed without waiting!"
       );
     }
-    throw new Error(`Server returned non-JSON response (${res.status}): ${rawText.slice(0, 100)}`);
+    if (res.status === 413 || rawText.includes("Payload Too Large")) {
+      throw new Error("Image file size is too large. Please select a smaller photo or crop it.");
+    }
+    if (res.status === 404 || rawText.includes("The page") || rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
+      throw new Error(
+        "Backend API not reached (404). Please ensure GEMINI_API_KEY is configured in Vercel Project Settings -> Environment Variables and redeploy."
+      );
+    }
+    throw new Error(`Server returned unexpected response (${res.status}).`);
   }
 
   if (!res.ok) {
@@ -63,3 +71,4 @@ export async function safeFetchApi(url: string, body: any) {
 
   return data;
 }
+

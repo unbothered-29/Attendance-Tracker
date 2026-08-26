@@ -73,63 +73,96 @@ export function Setup() {
     setStep(2);
   };
 
+  const compressImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1280;
+        let width = img.width;
+        let height = img.height;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(img.src);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessing(true);
-    setProcessingStatus('Analyzing timetable photo with AI OCR...');
+    setProcessingStatus('Optimizing image & analyzing timetable with AI...');
     setError('');
     
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        try {
-          setProcessingStatus('Extracting subjects and class schedules...');
-          const data = await safeFetchApi("/api/parse-timetable", { 
-            imageBase64: base64,
-            profile: {
-              year: selectedYear,
-              division: selectedDivision,
-              batch: selectedBatch,
-              field: selectedField,
-              semester: selectedSemester
-            }
-          });
+      // Compress image client-side to ensure sub-second upload and prevent serverless timeouts
+      const compressedBase64 = await compressImage(file);
 
-          let subjects = (data.subjects || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
-          let slots = (data.slots || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
-
-          // If OCR extracted 0 subjects, auto-generate fallback subjects so user gets a working review template
-          if (subjects.length === 0) {
-            const fieldNames = DEFAULT_FIELD_SUBJECTS[selectedField] || DEFAULT_FIELD_SUBJECTS['Engineering'];
-            subjects = fieldNames.map(name => ({ id: generateId(), name }));
-            slots = generatePresetSchedule(selectedField, subjects);
-            setError('Could not clearly detect all subjects from the image. We auto-populated a standard schedule for your field which you can edit below.');
-          }
-
-          setRawSubjects(subjects);
-          setRawSlots(slots);
-          setStep(3);
-        } catch (err: any) {
-          console.error(err);
-          // If API fails with error, offer fallback
-          setError(err.message || 'Failed to read image. Please try again or use Auto-Generate.');
-        } finally {
-          setIsProcessing(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
+      setProcessingStatus('Extracting subjects and class schedules...');
+      const data = await safeFetchApi("/api/parse-timetable", { 
+        imageBase64: compressedBase64,
+        profile: {
+          year: selectedYear,
+          division: selectedDivision,
+          batch: selectedBatch,
+          field: selectedField,
+          semester: selectedSemester
         }
-      };
-      reader.onerror = () => {
-        setError('Failed to read file from your device.');
-        setIsProcessing(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to process image. Please try again or use auto-generate.');
+      });
+
+      let subjects = (data.subjects || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
+      let slots = (data.slots || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
+
+      // If OCR extracted 0 subjects, auto-generate fallback subjects so user gets a working review template
+      if (subjects.length === 0) {
+        const fieldNames = DEFAULT_FIELD_SUBJECTS[selectedField] || DEFAULT_FIELD_SUBJECTS['Engineering'];
+        subjects = fieldNames.map(name => ({ id: generateId(), name }));
+        slots = generatePresetSchedule(selectedField, subjects);
+        setError('Could not clearly detect all subjects from the image. We auto-populated a standard schedule for your field which you can edit below.');
+      }
+
+      setRawSubjects(subjects);
+      setRawSlots(slots);
+      setStep(3);
+    } catch (err: any) {
+      console.error("Upload/OCR error:", err);
+      // If API times out or fails, offer fallback to Review step so user is not blocked
+      const fieldNames = DEFAULT_FIELD_SUBJECTS[selectedField] || DEFAULT_FIELD_SUBJECTS['Engineering'];
+      const fallbackSubjects = fieldNames.map(name => ({ id: generateId(), name }));
+      const fallbackSlots = generatePresetSchedule(selectedField, fallbackSubjects);
+      setRawSubjects(fallbackSubjects);
+      setRawSlots(fallbackSlots);
+      setError(
+        err.message || 'Timetable analysis took too long or encountered an issue. We loaded standard subjects for your profile so you can edit and confirm!'
+      );
+      setStep(3);
+    } finally {
       setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

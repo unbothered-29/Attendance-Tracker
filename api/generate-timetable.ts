@@ -1,5 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
+export const maxDuration = 60;
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -56,9 +58,9 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
     const modelsToTry = [
-      "gemini-3.7-flash",
-      "gemini-3.6-flash",
       "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
       "gemini-2.5-pro"
     ];
 
@@ -67,40 +69,31 @@ Notes:
     let lastError: any = null;
 
     for (const model of modelsToTry) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          response = await ai.models.generateContent({
-            model,
-            contents: [prompt],
-            config: {
-              responseMimeType: "application/json",
-              temperature: 0.7
-            }
-          });
-          if (response) break;
-        } catch (err: any) {
-          if (!firstError) firstError = err;
-          lastError = err;
-          const errStr = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
-          console.warn(`Model ${model} attempt ${attempt + 1} failed:`, errStr);
-
-          if (
-            errStr.includes("401") ||
-            errStr.includes("UNAUTHENTICATED") ||
-            errStr.includes("invalid authentication credentials") ||
-            errStr.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
-          ) {
-            throw err;
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents: [prompt],
+          config: {
+            responseMimeType: "application/json",
+            temperature: 0.7
           }
+        });
+        if (response) break;
+      } catch (err: any) {
+        if (!firstError) firstError = err;
+        lastError = err;
+        const errStr = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+        console.warn(`Model ${model} failed:`, errStr);
 
-          if (errStr.includes("404") || errStr.includes("NOT_FOUND") || errStr.includes("not found")) {
-            break;
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (
+          errStr.includes("401") ||
+          errStr.includes("UNAUTHENTICATED") ||
+          errStr.includes("invalid authentication credentials") ||
+          errStr.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+        ) {
+          throw err;
         }
       }
-      if (response) break;
     }
 
     if (!response) {
