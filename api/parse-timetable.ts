@@ -50,9 +50,18 @@ export default async function handler(req: any, res: any) {
       }
     }
     
-    const prompt = `You are a high-precision Timetable OCR and Schedule Parser.
-Your job is to read every single cell in the uploaded timetable photo with maximum accuracy.
+    const prompt = `You are a high-precision Timetable Image Validator & OCR Schedule Parser.
 
+STEP 1: IMAGE VALIDATION (CRITICAL)
+First, verify whether the provided image is a genuine academic/school/college timetable, class routine, or lecture schedule grid.
+- If the uploaded image is NOT a timetable (for example: a photo of a person/selfie, an animal, vehicle, scenery, landscape, food item, receipt, invoice, random object, textbook text without a weekly schedule grid, meme, screenshot of unrelated apps/games, or completely unreadable blur):
+  You MUST IMMEDIATELY return:
+  {
+    "isTimetable": false,
+    "error": "Invalid photo: The uploaded image is not a timetable or class schedule. Please upload a clear photo of your timetable."
+  }
+
+STEP 2: IF THE IMAGE IS A VALID TIMETABLE:
 USER PROFILE DETAILS (Use to narrow down if the timetable has multiple division or batch columns):
 - Field of Study: ${profile?.field || 'General'}
 - Semester: ${profile?.semester || '1'}
@@ -78,6 +87,7 @@ STRICT OCR INSTRUCTIONS:
 
 Format your response strictly as JSON with this exact structure:
 {
+  "isTimetable": true,
   "subjects": [
     { "id": "sub_1", "name": "Exact Subject Name", "teacher": "Teacher/Room (optional)" }
   ],
@@ -155,6 +165,15 @@ Format your response strictly as JSON with this exact structure:
       } else {
         return res.status(500).json({ error: "Failed to parse AI output. Please try again with a clearer image." });
       }
+    }
+
+    if (
+      data.isTimetable === false || 
+      (Array.isArray(data.subjects) && data.subjects.length === 0 && (!data.slots || data.slots.length === 0))
+    ) {
+      return res.status(400).json({
+        error: data.error || "Invalid photo: The uploaded image is not a timetable. Please upload a clear photo of your class schedule."
+      });
     }
 
     if (!Array.isArray(data.subjects)) data.subjects = [];

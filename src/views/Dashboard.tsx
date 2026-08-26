@@ -173,6 +173,10 @@ export function Dashboard() {
         try {
           const data = await safeFetchApi("/api/parse-timetable", { imageBase64: base64 });
 
+          if (!data.subjects || data.subjects.length === 0) {
+            throw new Error("Invalid photo: The uploaded image does not contain a valid timetable schedule. Please upload a clear photo of your timetable.");
+          }
+
           const generateId = () => Math.random().toString(36).substr(2, 9);
           // Add new subjects
           const newSubjects = (data.subjects || []).map((s: any) => ({ ...s, id: generateId() }));
@@ -195,7 +199,7 @@ export function Dashboard() {
           alert("Timetable added successfully!");
         } catch (err: any) {
           console.error(err);
-          alert(err.message || 'Failed to read image. Please try again.');
+          alert(err.message || 'Invalid photo: Failed to read timetable image. Please try again.');
         } finally {
           setIsUploadingTimetable(false);
         }

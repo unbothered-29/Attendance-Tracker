@@ -141,7 +141,7 @@ export function Setup() {
       let slots = (data.slots || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
 
       if (subjects.length === 0) {
-        throw new Error('No subjects could be detected in the uploaded photo. Please ensure the timetable image is clear and well-lit, or use Auto-Generate.');
+        throw new Error('Invalid photo: No timetable schedule could be detected. Please ensure you upload a clear photo of your timetable or use Auto-Generate.');
       }
 
       setRawSubjects(subjects);
@@ -149,9 +149,8 @@ export function Setup() {
       setStep(3);
     } catch (err: any) {
       console.error("Upload/OCR error:", err);
-      setError(
-        err.message || 'Failed to extract timetable from photo. Please try uploading a clearer image or click "Auto-Generate with AI".'
-      );
+      const msg = err.message || 'Failed to extract timetable from photo.';
+      setError(msg);
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -411,9 +410,14 @@ export function Setup() {
             />
 
             {error && (
-              <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 text-red-300 p-3 rounded-lg text-sm">
+              <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 text-red-200 p-3.5 rounded-xl text-sm animate-in fade-in">
                 <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                <p>{error}</p>
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-red-300">
+                    {error.toLowerCase().includes('invalid photo') ? 'Invalid Photo Detected' : 'Upload Notice'}
+                  </div>
+                  <p className="text-xs text-red-200/90 leading-relaxed">{error}</p>
+                </div>
               </div>
             )}
 
