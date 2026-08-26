@@ -29,42 +29,57 @@ async function startServer() {
           }
         }
       });
+
+      // Extract proper MIME type and clean base64 data
+      let mimeType = "image/jpeg";
+      let base64Data = imageBase64;
+      if (imageBase64.includes(";base64,")) {
+        const parts = imageBase64.split(";base64,");
+        const prefix = parts[0];
+        base64Data = parts[1];
+        const mimeMatch = prefix.match(/data:(image\/[a-zA-Z0-9.+_-]+)/);
+        if (mimeMatch) {
+          mimeType = mimeMatch[1];
+        }
+      }
       
-      const prompt = `Extract the timetable schedule from this image.
-The user's profile is:
-- Year: ${profile?.year || 'Any'}
-- Division: ${profile?.division || 'Any'}
-- Batch: ${profile?.batch || 'Any'}
-- Field: ${profile?.field || 'Any'}
-- Semester: ${profile?.semester || 'Any'}
+      const prompt = `You are an expert OCR timetable parser. Extract all class schedules and subjects from this timetable image.
 
-Extract ONLY the subjects and slots that apply to this specific profile. Ignore classes for other divisions, batches, or years.
+User's Profile Information (use to prioritize if multiple divisions/batches are listed):
+- Field of Study: ${profile?.field || 'Engineering / General'}
+- Current Semester: ${profile?.semester || '1'}
+- Year of Study: ${profile?.year || 'FE'}
+- Division: ${profile?.division || 'All / General'}
+- Batch: ${profile?.batch || 'All / General'}
 
-Return ONLY valid JSON matching this schema, without any markdown formatting or code blocks:
+Extraction Rules:
+1. Examine all grid cells, time headers, day rows/columns (Monday through Saturday/Sunday), and subject abbreviations/names.
+2. If the image contains multiple division or batch sections, prioritize the one matching the user profile. If none specifically match or if it is a general class timetable, EXTRACT ALL classes visible on the schedule.
+3. Extract clean subject names (expand standard acronyms if obvious, e.g. "DSA" -> "Data Structures & Algorithms", "M1" -> "Engineering Mathematics 1", or keep the name written). If a teacher or classroom is mentioned, put it in 'teacher'.
+4. Ensure each subject has a unique id like "sub_1", "sub_2", etc.
+5. Extract each slot with:
+   - "id": unique string e.g. "slot_1", "slot_2"
+   - "subjectId": matching the subject's id (e.g. "sub_1")
+   - "start": 24-hour time "HH:MM" (e.g. "09:00", "10:30", "14:00")
+   - "end": 24-hour time "HH:MM" (e.g. "10:00", "11:30", "15:00")
+   - "dayOfWeek": integer where 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday, 0=Sunday.
+6. Do NOT return an empty subject list if any timetable or class data is visible in the image.
+
+Return ONLY valid JSON matching this schema:
 {
-  "subjects": [{"id": "sub_1", "name": "Subject Name", "teacher": "Teacher Name (if available)"}],
+  "subjects": [
+    { "id": "sub_1", "name": "Subject Name", "teacher": "Teacher Name" }
+  ],
   "slots": [
-    {
-      "id": "slot_1",
-      "subjectId": "sub_1",
-      "start": "09:00",
-      "end": "10:00",
-      "dayOfWeek": 1 // 0=Sun, 1=Mon, 2=Tue, etc.
-    }
+    { "id": "slot_1", "subjectId": "sub_1", "start": "09:00", "end": "10:00", "dayOfWeek": 1 }
   ]
-}
-
-Notes:
-- Use 24-hour time format for start and end (e.g. 14:30).
-- Group the same subject under the same subjectId.`;
+}`;
 
       const modelsToTry = [
+        "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
+        "gemini-2.5-pro"
       ];
 
       let response: any = null;
@@ -80,8 +95,8 @@ Notes:
                 prompt,
                 {
                   inlineData: {
-                    data: imageBase64.split(",")[1] || imageBase64,
-                    mimeType: "image/jpeg"
+                    data: base64Data,
+                    mimeType
                   }
                 }
               ],
@@ -120,16 +135,30 @@ Notes:
         throw firstError || lastError || new Error("Failed to parse timetable schedule with available models.");
       }
 
-      let responseText = response.text || "{}";
+      let responseText = (response.text || "").trim();
       
       // Clean up markdown block if present
-      if (responseText.startsWith("\`\`\`json")) {
-        responseText = responseText.replace(/^\`\`\`json\n/, "").replace(/\n\`\`\`$/, "");
-      } else if (responseText.startsWith("\`\`\`")) {
-        responseText = responseText.replace(/^\`\`\`\n/, "").replace(/\n\`\`\`$/, "");
+      if (responseText.startsWith("```json")) {
+        responseText = responseText.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+      } else if (responseText.startsWith("```")) {
+        responseText = responseText.replace(/^```\n?/, "").replace(/\n?```$/, "");
       }
 
-      const data = JSON.parse(responseText);
+      let data: any;
+      try {
+        data = JSON.parse(responseText.trim());
+      } catch {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          data = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("Failed to parse AI response into structured timetable format.");
+        }
+      }
+
+      if (!Array.isArray(data.subjects)) data.subjects = [];
+      if (!Array.isArray(data.slots)) data.slots = [];
+
       res.json(data);
     } catch (error: any) {
       console.error("Error parsing timetable:", error);
@@ -169,11 +198,11 @@ Notes:
       });
       
       const prompt = `Generate a realistic college timetable for a student with the following profile:
-- Year: ${profile.year}
+- Year: ${profile.year || 'FE'}
 - Division: ${profile.division || 'A'}
 - Batch: ${profile.batch || 'B1'}
-- Field: ${profile.field}
-- Semester: ${profile.semester}
+- Field: ${profile.field || 'Engineering'}
+- Semester: ${profile.semester || '1'}
 
 Create a realistic weekly schedule (Monday to Friday, typically 9 AM to 4 PM, with appropriate gaps). Include 4-6 relevant subjects for this field and semester. Include a mix of lectures and practicals/labs if appropriate for the field.
 
@@ -186,7 +215,7 @@ Return ONLY valid JSON matching this schema, without any markdown formatting or 
       "subjectId": "sub_1",
       "start": "09:00",
       "end": "10:00",
-      "dayOfWeek": 1 // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
+      "dayOfWeek": 1
     }
   ]
 }
@@ -197,12 +226,10 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
       const modelsToTry = [
+        "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
+        "gemini-2.5-pro"
       ];
 
       let response: any = null;
@@ -250,16 +277,30 @@ Notes:
         throw firstError || lastError || new Error("Failed to generate timetable with available models.");
       }
 
-      let responseText = response.text || "{}";
+      let responseText = (response.text || "").trim();
       
       // Clean up markdown block if present
-      if (responseText.startsWith("\`\`\`json")) {
-        responseText = responseText.replace(/^\`\`\`json\n/, "").replace(/\n\`\`\`$/, "");
-      } else if (responseText.startsWith("\`\`\`")) {
-        responseText = responseText.replace(/^\`\`\`\n/, "").replace(/\n\`\`\`$/, "");
+      if (responseText.startsWith("```json")) {
+        responseText = responseText.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+      } else if (responseText.startsWith("```")) {
+        responseText = responseText.replace(/^```\n?/, "").replace(/\n?```$/, "");
       }
 
-      const data = JSON.parse(responseText);
+      let data: any;
+      try {
+        data = JSON.parse(responseText.trim());
+      } catch {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          data = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("Failed to parse AI response into structured timetable format.");
+        }
+      }
+
+      if (!Array.isArray(data.subjects)) data.subjects = [];
+      if (!Array.isArray(data.slots)) data.slots = [];
+
       res.json(data);
     } catch (error: any) {
       console.error("Error generating timetable:", error);

@@ -28,11 +28,11 @@ export default async function handler(req: any, res: any) {
     });
     
     const prompt = `Generate a realistic college timetable for a student with the following profile:
-- Year: ${profile.year}
+- Year: ${profile.year || 'FE'}
 - Division: ${profile.division || 'A'}
 - Batch: ${profile.batch || 'B1'}
-- Field: ${profile.field}
-- Semester: ${profile.semester}
+- Field: ${profile.field || 'Engineering'}
+- Semester: ${profile.semester || '1'}
 
 Create a realistic weekly schedule (Monday to Friday, typically 9 AM to 4 PM, with appropriate gaps). Include 4-6 relevant subjects for this field and semester. Include a mix of lectures and practicals/labs if appropriate for the field.
 
@@ -56,12 +56,10 @@ Notes:
 - Provide a realistic 5-day schedule.`;
 
     const modelsToTry = [
+      "gemini-3.7-flash",
       "gemini-3.6-flash",
       "gemini-2.5-flash",
-      "gemini-2.5-pro",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-pro"
+      "gemini-2.5-pro"
     ];
 
     let response: any = null;
@@ -109,7 +107,7 @@ Notes:
       throw firstError || lastError || new Error("Failed to generate timetable with available models.");
     }
 
-    let responseText = response.text || "{}";
+    let responseText = (response.text || "").trim();
     
     if (responseText.startsWith("```json")) {
       responseText = responseText.replace(/^```json\n?/, "").replace(/\n?```$/, "");
@@ -117,12 +115,22 @@ Notes:
       responseText = responseText.replace(/^```\n?/, "").replace(/\n?```$/, "");
     }
 
+    let data: any;
     try {
-      const data = JSON.parse(responseText.trim());
-      return res.status(200).json(data);
+      data = JSON.parse(responseText.trim());
     } catch {
-      return res.status(500).json({ error: "Failed to parse AI output as JSON." });
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        data = JSON.parse(jsonMatch[0]);
+      } else {
+        return res.status(500).json({ error: "Failed to parse AI output as JSON." });
+      }
     }
+
+    if (!Array.isArray(data.subjects)) data.subjects = [];
+    if (!Array.isArray(data.slots)) data.slots = [];
+
+    return res.status(200).json(data);
   } catch (error: any) {
     console.error("Error generating timetable:", error);
     const errStr = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
