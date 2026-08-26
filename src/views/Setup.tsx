@@ -77,7 +77,8 @@ export function Setup() {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const MAX_DIM = 1280;
+        // Use 2048px maximum dimension to keep small timetable grid text razor sharp
+        const MAX_DIM = 2048;
         let width = img.width;
         let height = img.height;
         if (width > MAX_DIM || height > MAX_DIM) {
@@ -97,8 +98,11 @@ export function Setup() {
           resolve(img.src);
           return;
         }
+        // Enable high-quality image smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        resolve(canvas.toDataURL('image/jpeg', 0.90));
       };
       img.onerror = () => reject(new Error('Failed to load image for compression'));
       const reader = new FileReader();
@@ -115,14 +119,13 @@ export function Setup() {
     if (!file) return;
 
     setIsProcessing(true);
-    setProcessingStatus('Optimizing image & analyzing timetable with AI...');
+    setProcessingStatus('Analyzing timetable photo with Gemini 3.6 Flash...');
     setError('');
     
     try {
-      // Compress image client-side to ensure sub-second upload and prevent serverless timeouts
       const compressedBase64 = await compressImage(file);
 
-      setProcessingStatus('Extracting subjects and class schedules...');
+      setProcessingStatus('Extracting subjects and class schedule from your photo...');
       const data = await safeFetchApi("/api/parse-timetable", { 
         imageBase64: compressedBase64,
         profile: {
@@ -137,12 +140,8 @@ export function Setup() {
       let subjects = (data.subjects || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
       let slots = (data.slots || []).map((s: any) => ({ ...s, id: s.id || generateId() }));
 
-      // If OCR extracted 0 subjects, auto-generate fallback subjects so user gets a working review template
       if (subjects.length === 0) {
-        const fieldNames = DEFAULT_FIELD_SUBJECTS[selectedField] || DEFAULT_FIELD_SUBJECTS['Engineering'];
-        subjects = fieldNames.map(name => ({ id: generateId(), name }));
-        slots = generatePresetSchedule(selectedField, subjects);
-        setError('Could not clearly detect all subjects from the image. We auto-populated a standard schedule for your field which you can edit below.');
+        throw new Error('No subjects could be detected in the uploaded photo. Please ensure the timetable image is clear and well-lit, or use Auto-Generate.');
       }
 
       setRawSubjects(subjects);
@@ -150,16 +149,9 @@ export function Setup() {
       setStep(3);
     } catch (err: any) {
       console.error("Upload/OCR error:", err);
-      // If API times out or fails, offer fallback to Review step so user is not blocked
-      const fieldNames = DEFAULT_FIELD_SUBJECTS[selectedField] || DEFAULT_FIELD_SUBJECTS['Engineering'];
-      const fallbackSubjects = fieldNames.map(name => ({ id: generateId(), name }));
-      const fallbackSlots = generatePresetSchedule(selectedField, fallbackSubjects);
-      setRawSubjects(fallbackSubjects);
-      setRawSlots(fallbackSlots);
       setError(
-        err.message || 'Timetable analysis took too long or encountered an issue. We loaded standard subjects for your profile so you can edit and confirm!'
+        err.message || 'Failed to extract timetable from photo. Please try uploading a clearer image or click "Auto-Generate with AI".'
       );
-      setStep(3);
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

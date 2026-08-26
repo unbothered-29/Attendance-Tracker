@@ -50,43 +50,47 @@ export default async function handler(req: any, res: any) {
       }
     }
     
-    const prompt = `You are an expert OCR timetable parser. Extract all class schedules and subjects from this timetable image.
+    const prompt = `You are a high-precision Timetable OCR and Schedule Parser.
+Your job is to read every single cell in the uploaded timetable photo with maximum accuracy.
 
-User's Profile Information (use to prioritize if multiple divisions/batches are listed):
-- Field of Study: ${profile?.field || 'Engineering / General'}
-- Current Semester: ${profile?.semester || '1'}
-- Year of Study: ${profile?.year || 'FE'}
-- Division: ${profile?.division || 'All / General'}
-- Batch: ${profile?.batch || 'All / General'}
+USER PROFILE DETAILS (Use to narrow down if the timetable has multiple division or batch columns):
+- Field of Study: ${profile?.field || 'General'}
+- Semester: ${profile?.semester || '1'}
+- Year: ${profile?.year || 'FE'}
+- Division: ${profile?.division || 'General'}
+- Batch: ${profile?.batch || 'General'}
 
-Extraction Rules:
-1. Examine all grid cells, time headers, day rows/columns (Monday through Saturday/Sunday), and subject abbreviations/names.
-2. If the image contains multiple division or batch sections, prioritize the one matching the user profile. If none specifically match or if it is a general class timetable, EXTRACT ALL classes visible on the schedule.
-3. Extract clean subject names (expand standard acronyms if obvious, e.g. "DSA" -> "Data Structures & Algorithms", "M1" -> "Engineering Mathematics 1", or keep the name written). If a teacher or classroom is mentioned, put it in 'teacher'.
-4. Ensure each subject has a unique id like "sub_1", "sub_2", etc.
-5. Extract each slot with:
-   - "id": unique string e.g. "slot_1", "slot_2"
-   - "subjectId": matching the subject's id (e.g. "sub_1")
-   - "start": 24-hour time "HH:MM" (e.g. "09:00", "10:30", "14:00")
-   - "end": 24-hour time "HH:MM" (e.g. "10:00", "11:30", "15:00")
-   - "dayOfWeek": integer where 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday, 0=Sunday.
-6. Do NOT return an empty subject list if any timetable or class data is visible in the image.
+STRICT OCR INSTRUCTIONS:
+1. Examine the grid layout: Identify the Day headers (e.g. Mon, Tue, Wed, Thu, Fri, Sat) and Time slot headers (e.g. 08:30-09:30, 09:30-10:30, 11:00-12:00, 1:00-2:00, etc.).
+2. Read the text inside EVERY cell for each day and time slot.
+3. DO NOT invent fake, random, or generic subjects (like "Engineering Mathematics" or "Data Structures" unless that is literally what is written in the image). Extract the exact subject name, acronym, or course code written in the image (e.g., "CHEM", "PHY", "MATHS-II", "CS-101", "BEE", "EM", "LAB A1", etc.).
+4. If a teacher's name or room/lab number is written in the cell (e.g., "Dr. Smith", "Room 302", "Lab 4"), include it in the 'teacher' field.
+5. In the "subjects" array, create an entry for every unique subject found on the schedule with:
+   - "id": a unique string like "sub_1", "sub_2", "sub_3", etc.
+   - "name": the subject name as written in the timetable
+   - "teacher": teacher name/room if mentioned (optional string)
+6. In the "slots" array, create an entry for every class/period scheduled across the week:
+   - "id": unique string (e.g., "slot_1", "slot_2", ...)
+   - "subjectId": the "id" of the matching subject from the "subjects" array
+   - "dayOfWeek": integer representing the day (1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday, 0 = Sunday)
+   - "start": start time in 24-hour format "HH:MM" (e.g., "09:00", "10:30", "14:15")
+   - "end": end time in 24-hour format "HH:MM" (e.g., "10:00", "11:30", "15:15")
 
-Return ONLY valid JSON matching this schema:
+Format your response strictly as JSON with this exact structure:
 {
   "subjects": [
-    { "id": "sub_1", "name": "Subject Name", "teacher": "Teacher Name" }
+    { "id": "sub_1", "name": "Exact Subject Name", "teacher": "Teacher/Room (optional)" }
   ],
   "slots": [
-    { "id": "slot_1", "subjectId": "sub_1", "start": "09:00", "end": "10:00", "dayOfWeek": 1 }
+    { "id": "slot_1", "subjectId": "sub_1", "dayOfWeek": 1, "start": "09:00", "end": "10:00" }
   ]
 }`;
 
     const modelsToTry = [
+      "gemini-3.6-flash",
+      "gemini-3.7-flash",
       "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-2.5-pro"
+      "gemini-flash-latest"
     ];
 
     let response: any = null;
