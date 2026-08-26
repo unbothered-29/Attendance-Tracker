@@ -4,7 +4,7 @@ import { NATIONAL_HOLIDAYS, cn, formatTime12 } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { format, addDays, startOfWeek, isSameDay, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, endOfWeek } from 'date-fns';
-import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus, Calendar, MinusCircle, Camera, Trash2, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, CalendarOff, LogOut, Edit2, Save, User as UserIcon, UploadCloud, Plus, Calendar, MinusCircle, Camera, Trash2, Check, Lock, Eye, EyeOff, AlertCircle, KeyRound, AtSign } from 'lucide-react';
 import { Subject, TimeSlot, User } from '../types';
 import { TimePicker12 } from '../components/TimePicker12';
 import { safeFetchApi } from '../lib/api';
@@ -16,7 +16,7 @@ export function Dashboard() {
     state, markAttendance, removeAttendance, toggleOffDay, 
     updateDailySlotOverride, updateTimetableSlot, startNewSemester, 
     resetData, setNote, setSubjects, setTimetable,
-    login, setUserField, setUserYear, setUserDivision, setUserBatch, setUserSemester, setAttendanceGoal
+    login, updateUserProfile, updateUserPassword, setUserField, setUserYear, setUserDivision, setUserBatch, setUserSemester, setAttendanceGoal
   } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -31,16 +31,80 @@ export function Dashboard() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSavedSuccess, setProfileSavedSuccess] = useState(false);
 
-  const handleSaveProfile = () => {
+  // Profile editable fields
+  const [profileUsername, setProfileUsername] = useState(state.user?.username || '');
+  const [profileName, setProfileName] = useState(state.user?.name || '');
+  const [profileCollege, setProfileCollege] = useState(state.user?.college || '');
+
+  // Password update states
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Keep profile inputs in sync with state when modal opens
+  useEffect(() => {
+    if (showProfileModal && state.user) {
+      setProfileUsername(state.user.username || '');
+      setProfileName(state.user.name || '');
+      setProfileCollege(state.user.college || '');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setPasswordError('');
+      setPasswordSuccess(false);
+    }
+  }, [showProfileModal, state.user]);
+
+  const handleSaveProfile = async () => {
     setIsSavingProfile(true);
-    setTimeout(() => {
+    try {
+      await updateUserProfile({
+        username: profileUsername.trim().replace(/^@/, ''),
+        name: profileName.trim(),
+        college: profileCollege.trim(),
+      });
       setIsSavingProfile(false);
       setProfileSavedSuccess(true);
       setTimeout(() => {
         setProfileSavedSuccess(false);
-        setShowProfileModal(false);
-      }, 600);
-    }, 200);
+      }, 1500);
+    } catch (e) {
+      console.error('Error saving profile:', e);
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      await updateUserPassword(newPassword);
+      setIsUpdatingPassword(false);
+      setPasswordSuccess(true);
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setTimeout(() => {
+        setPasswordSuccess(false);
+      }, 3000);
+    } catch (err: any) {
+      console.error(err);
+      setIsUpdatingPassword(false);
+      setPasswordError(err.message || 'Failed to update password.');
+    }
   };
   
   const [isUploadingTimetable, setIsUploadingTimetable] = useState(false);
@@ -739,106 +803,201 @@ export function Dashboard() {
               </div>
 
               <div className="space-y-4">
-                {/* Username */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-purple-300 uppercase tracking-wider">Username</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-400 text-sm">@</span>
+                {/* Section: Account Credentials */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-3.5">
+                  <div className="flex items-center gap-2 pb-1 border-b border-white/5">
+                    <UserIcon className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-white uppercase tracking-wider">Account Credentials</span>
+                  </div>
+
+                  {/* Username */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-purple-300">Username</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-gray-400 text-sm">@</span>
+                      <input 
+                        type="text"
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-600"
+                        placeholder="username"
+                        value={profileUsername}
+                        onChange={(e) => setProfileUsername(e.target.value.replace(/^@/, ''))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-purple-300">Full Name</label>
                     <input 
                       type="text"
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-600"
-                      placeholder="username"
-                      defaultValue={state.user?.username || ''}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/^@/, '');
-                        login({ ...state.user!, username: val });
-                      }}
+                      className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                    />
+                  </div>
+
+                  {/* College */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-purple-300">College / University</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      value={profileCollege}
+                      onChange={(e) => setProfileCollege(e.target.value)}
                     />
                   </div>
                 </div>
 
-                {/* Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-purple-300 uppercase tracking-wider">Full Name</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
-                    defaultValue={state.user?.name}
-                    onChange={(e) => login({ ...state.user!, name: e.target.value })}
-                  />
+                {/* Section: Change Password */}
+                <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-3">
+                  <div className="flex items-center gap-2 pb-1 border-b border-white/5">
+                    <KeyRound className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-white uppercase tracking-wider">Change Password</span>
+                  </div>
+
+                  {passwordError && (
+                    <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-start gap-2 animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                      <span>{passwordError}</span>
+                    </div>
+                  )}
+
+                  {passwordSuccess && (
+                    <div className="p-2.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-300 text-xs flex items-center gap-2 animate-in fade-in">
+                      <Check className="w-4 h-4 shrink-0 text-green-400" />
+                      <span>Password updated successfully!</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-gray-300">New Password</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+                          <Lock className="w-3.5 h-3.5" />
+                        </div>
+                        <input 
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Enter new password (min 6 chars)"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-black/40 border border-purple-500/30 rounded-lg pl-8 pr-8 py-2 text-xs sm:text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-200"
+                        >
+                          {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-gray-300">Confirm New Password</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+                          <Lock className="w-3.5 h-3.5" />
+                        </div>
+                        <input 
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Confirm new password"
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          className="w-full bg-black/40 border border-purple-500/30 rounded-lg pl-8 pr-3 py-2 text-xs sm:text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-600"
+                        />
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUpdatePassword}
+                      disabled={isUpdatingPassword || !newPassword || !confirmNewPassword}
+                      className="w-full mt-1 border-purple-500/30 text-purple-300 hover:bg-purple-500/10 text-xs h-8 flex items-center justify-center gap-1.5"
+                    >
+                      {isUpdatingPassword ? (
+                        <span className="flex items-center gap-2">
+                          <div className="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                          Updating Password...
+                        </span>
+                      ) : (
+                        <>
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Update Password</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
-                {/* College */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-purple-300 uppercase tracking-wider">College / University</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
-                    defaultValue={state.user?.college || ''}
-                    onChange={(e) => login({ ...state.user!, college: e.target.value })}
-                  />
-                </div>
+                {/* Section: Academic Details */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-3">
+                  <span className="text-xs font-semibold text-white uppercase tracking-wider block pb-1 border-b border-white/5">
+                    Academic Details & Goals
+                  </span>
 
-                {/* Academic Grid */}
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div className="space-y-1">
-                    <label className="text-xs text-gray-400">Field</label>
-                    <input 
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
-                      defaultValue={state.userField}
-                      onChange={(e) => setUserField(e.target.value)}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400">Field</label>
+                      <input 
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                        defaultValue={state.userField}
+                        onChange={(e) => setUserField(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400">Year</label>
+                      <input 
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                        defaultValue={state.userYear}
+                        onChange={(e) => setUserYear(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-gray-400">Year</label>
-                    <input 
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
-                      defaultValue={state.userYear}
-                      onChange={(e) => setUserYear(e.target.value)}
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-gray-400">Division</label>
-                    <input 
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
-                      defaultValue={state.userDivision}
-                      onChange={(e) => setUserDivision(e.target.value)}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400">Division</label>
+                      <input 
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                        defaultValue={state.userDivision}
+                        onChange={(e) => setUserDivision(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400">Batch</label>
+                      <input 
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                        defaultValue={state.userBatch}
+                        onChange={(e) => setUserBatch(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-gray-400">Batch</label>
-                    <input 
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
-                      defaultValue={state.userBatch}
-                      onChange={(e) => setUserBatch(e.target.value)}
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-gray-400">Semester</label>
-                    <input 
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
-                      defaultValue={state.userSemester}
-                      onChange={(e) => setUserSemester(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-gray-400">Goal (%)</label>
-                    <input 
-                      type="number"
-                      className="w-full bg-white/5 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
-                      defaultValue={state.attendanceGoal}
-                      onChange={(e) => setAttendanceGoal(Number(e.target.value))}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400">Semester</label>
+                      <input 
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                        defaultValue={state.userSemester}
+                        onChange={(e) => setUserSemester(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400">Goal (%)</label>
+                      <input 
+                        type="number"
+                        className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-gray-200"
+                        defaultValue={state.attendanceGoal}
+                        onChange={(e) => setAttendanceGoal(Number(e.target.value))}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-white/10 space-y-3">
+                <div className="pt-2 border-t border-white/10 space-y-3">
                   <Button 
                     type="button" 
                     onClick={handleSaveProfile}

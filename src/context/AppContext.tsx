@@ -1,8 +1,18 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { AppState, Subject, TimeSlot, User } from '../types';
 import { auth, googleProvider, db } from '../lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signInAnonymously, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signInAnonymously, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updatePassword as fbUpdatePassword,
+  updateProfile as fbUpdateProfile,
+  signOut as firebaseSignOut, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 
 const defaultState: AppState = {
   user: null,
@@ -19,6 +29,10 @@ interface AppContextType {
   firebaseUser: FirebaseUser | null;
   loadingAuth: boolean;
   login: (user: User) => Promise<void>;
+  loginWithPassword: (identifier: string, password: string) => Promise<void>;
+  registerWithPassword: (data: { name: string; username: string; email?: string; college: string; password: string }) => Promise<void>;
+  updateUserPassword: (newPassword: string) => Promise<void>;
+  updateUserProfile: (user: Partial<User>) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   setAttendanceGoal: (goal: number) => void;
@@ -41,6 +55,16 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// Helper to convert username to deterministic auth email
+export function getEmailForUsername(identifier: string): string {
+  const trimmed = identifier.trim().toLowerCase();
+  if (trimmed.includes('@')) {
+    return trimmed;
+  }
+  const cleanUsername = trimmed.replace(/^@/, '').replace(/[^a-z0-9_.-]/g, '');
+  return `${cleanUsername || 'student'}@student.attendance.app`;
+}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(() => {
@@ -178,6 +202,135 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(db, 'users', currentFbUser.uid);
       const dataToSave = sanitizeForFirestore({
         user: updatedUser,
+        updatedAt: new Date().toISOString()
+      });
+      await setDoc(userDocRef, dataToSave, { merge: true });
+    }
+  };
+
+  const loginWithPassword = async (identifier: string, password: string) => {
+    const email = getEmailForUsername(identifier);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const user = cred.user;
+      const userDocRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(userDocRef);
+
+      const cleanUname = identifier.includes('@student.attendance.app')
+        ? identifier.split('@')[0]
+        : (identifier.includes('@') ? '' : identifier.replace(/^@/, ''));
+
+      let userInfo: User = {
+        uid: user.uid,
+        name: user.displayName || cleanUname || 'Student',
+        username: cleanUname,
+        email: user.email || '',
+        college: 'Not specified'
+      };
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.user) {
+          userInfo = { ...data.user, uid: user.uid };
+        }
+      }
+
+      setState((s) => ({ ...s, user: userInfo }));
+    } catch (error: any) {
+      console.error('Password login error:', error);
+      if (
+        error?.code === 'auth/invalid-credential' ||
+        error?.code === 'auth/user-not-found' ||
+        error?.code === 'auth/wrong-password'
+      ) {
+        throw new Error('Invalid username/email or password. Please check your credentials.');
+      }
+      if (error?.code === 'auth/too-many-requests') {
+        throw new Error('Too many failed attempts. Please wait a moment and try again.');
+      }
+      throw new Error(error?.message || 'Failed to sign in with password.');
+    }
+  };
+
+  const registerWithPassword = async (data: { name: string; username: string; email?: string; college: string; password: string }) => {
+    const cleanUsername = data.username.trim().replace(/^@/, '');
+    const authEmail = data.email?.trim() ? data.email.trim() : getEmailForUsername(cleanUsername);
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, authEmail, data.password);
+      const user = cred.user;
+      
+      await fbUpdateProfile(user, {
+        displayName: data.name
+      }).catch(() => {});
+
+      const newUser: User = {
+        uid: user.uid,
+        name: data.name,
+        username: cleanUsername,
+        email: data.email?.trim() || authEmail,
+        college: data.college || 'Not specified'
+      };
+
+      setState((s) => ({ ...s, user: newUser }));
+
+      const userDocRef = doc(db, 'users', user.uid);
+      const dataToSave = sanitizeForFirestore({
+        user: newUser,
+        updatedAt: new Date().toISOString()
+      });
+      await setDoc(userDocRef, dataToSave, { merge: true });
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      if (error?.code === 'auth/email-already-in-use') {
+        throw new Error('This username or email is already registered. Please sign in instead.');
+      }
+      if (error?.code === 'auth/weak-password') {
+        throw new Error('Password should be at least 6 characters long.');
+      }
+      if (error?.code === 'auth/invalid-email') {
+        throw new Error('Invalid username or email format.');
+      }
+      throw new Error(error?.message || 'Failed to create account.');
+    }
+  };
+
+  const updateUserPassword = async (newPassword: string) => {
+    if (!auth.currentUser) {
+      throw new Error('No user is currently signed in.');
+    }
+    try {
+      await fbUpdatePassword(auth.currentUser, newPassword);
+      // Record update timestamp
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await setDoc(userDocRef, { passwordLastUpdated: new Date().toISOString() }, { merge: true });
+    } catch (error: any) {
+      console.error('Update password error:', error);
+      if (error?.code === 'auth/requires-recent-login') {
+        throw new Error('For security, please log out and sign in again before changing your password.');
+      }
+      if (error?.code === 'auth/weak-password') {
+        throw new Error('New password should be at least 6 characters.');
+      }
+      throw new Error(error?.message || 'Failed to update password.');
+    }
+  };
+
+  const updateUserProfile = async (updatedFields: Partial<User>) => {
+    setState((s) => {
+      if (!s.user) return s;
+      const newUser = { ...s.user, ...updatedFields };
+      return { ...s, user: newUser };
+    });
+
+    const currentFbUser = auth.currentUser;
+    if (currentFbUser) {
+      if (updatedFields.name) {
+        fbUpdateProfile(currentFbUser, { displayName: updatedFields.name }).catch(() => {});
+      }
+      const userDocRef = doc(db, 'users', currentFbUser.uid);
+      const dataToSave = sanitizeForFirestore({
+        user: { ...state.user, ...updatedFields, uid: currentFbUser.uid },
         updatedAt: new Date().toISOString()
       });
       await setDoc(userDocRef, dataToSave, { merge: true });
@@ -329,6 +482,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         firebaseUser,
         loadingAuth,
         login,
+        loginWithPassword,
+        registerWithPassword,
+        updateUserPassword,
+        updateUserProfile,
         loginWithGoogle,
         logout,
         setAttendanceGoal,
